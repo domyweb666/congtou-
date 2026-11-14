@@ -8,6 +8,19 @@
 
 ![主畫面：頂列一顆日期鈕，下面就是今天這一頁](docs/img/main.png)
 
+## 下載
+
+目前版本 0.4.0。點檔名直接下載：
+
+| 你的電腦 | 下載 |
+|---|---|
+| Windows | [congcongdiu-0.4.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-win-x64-setup.exe)（安裝檔，122 MB） |
+| Mac，M 系列晶片 | [congcongdiu-0.4.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-mac-arm64.dmg)（120 MB） |
+| Mac，Intel | [congcongdiu-0.4.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-mac-x64.dmg)（127 MB） |
+
+不想安裝的話，[Releases 頁面](https://github.com/domyweb666/congtou-/releases/latest)還有解壓縮就能用的 zip。第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
+
+
 ## 怎麼用
 
 ### 丟進來
@@ -105,7 +118,7 @@ Ctrl+F 會搜尋所有日子，多個字用空格分開。點結果會跳到那�
 
 ## 安裝
 
-打包好的檔案在 [Releases](https://github.com/domyweb666/congtou-/releases)。
+下載連結在最上面的[下載](#下載)，所有版本在 [Releases](https://github.com/domyweb666/congtou-/releases)。
 
 ### Windows
 
