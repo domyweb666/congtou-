@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, shell, nativeImage, net } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, shell, nativeImage, nativeTheme, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -52,7 +52,8 @@ function createWindow() {
     icon: asset('icon.png'),
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#ffffff',
+    // 開視窗那一瞬間的底色，跟設計系統 --ap-surface 淺色、深色同值，深色下才不會先閃一下白
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#232326' : '#ffffff',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false, spellcheck: false },
   });
   win.setMenuBarVisibility(false);

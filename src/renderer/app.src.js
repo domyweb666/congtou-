@@ -14,6 +14,11 @@ import { Markdown } from 'tiptap-markdown';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 
 const $ = (id) => document.getElementById(id);
+// 深色跟著系統走：設計系統的深色代號掛在 <html data-theme="dark">
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const applyTheme = () => { if (darkQuery.matches) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme; };
+applyTheme();
+darkQuery.addEventListener('change', applyTheme);
 const pad = (n) => String(n).padStart(2, '0');
 const toKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -60,8 +65,9 @@ function fmtDate(k) { const d = fromKey(k); return `${d.getFullYear()}年${d.get
 function fmtShort(k) { const d = fromKey(k); return `${d.getMonth() + 1}月${d.getDate()}日`; }
 
 let toastTimer = null;
-function toast(text, ms = 4000) {
+function toast(text, ms = 4000, bad = false) {
   $('toastText').textContent = text;
+  $('toast').classList.toggle('is-error', !!bad);
   $('toastAction').hidden = true;
   $('toast').hidden = false;
   clearTimeout(toastTimer);
@@ -85,7 +91,7 @@ const FileChip = Node.create({
   renderHTML({ node }) {
     const { rel, name, size } = node.attrs;
     const ext = name.includes('.') ? name.split('.').pop().slice(0, 5).toUpperCase() : 'FILE';
-    return ['div', { 'data-file': rel, 'data-name': name, 'data-size': String(size), class: 'filechip', title: `${name}（點兩下打開）` },
+    return ['div', { 'data-file': rel, 'data-name': name, 'data-size': String(size), class: 'filechip', title: `${name}（點兩下，或選取後按 Enter 打開）` },
       ['span', { class: 'ext' }, ext], ['span', { class: 'name' }, name], ['span', { class: 'size' }, fmtSize(size)]];
   },
   renderText({ node }) { return node.attrs.name; },
@@ -204,7 +210,9 @@ async function flush() {
   } catch (err) {
     state.dirty = true;
     setSaveState('沒存成功，內容還在這一頁', true);
-    toast(`沒存成功：${err.message || err}`);
+    toast(`這一頁沒存成功，內容還留在畫面上，5 秒後會再存一次。（${err.message || err}）`, 6000, true);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 5000);
   }
 }
 function markDirty() {
@@ -259,11 +267,21 @@ function placeGrip(y) {
   grip.el.hidden = false;
   grip.pos = b.pos; grip.dom = b.dom;
 }
-function copyBlock() {
-  if (grip.pos == null) return;
+// 游標所在的最上層區塊位置（鍵盤複製整塊用）
+function currentBlockPos() {
+  const sel = editor.state.selection;
+  const $f = sel.$from;
+  if ($f.depth >= 1) return $f.before(1);
+  return sel instanceof NodeSelection ? sel.from : null;
+}
+function copyBlock(at) {
+  const pos = typeof at === 'number' ? at : grip.pos;
+  if (pos == null) return;
   const view = editor.view;
+  const target = view.state.doc.nodeAt(pos);
+  if (!target || (target.type.name === 'paragraph' && !target.content.size)) { toast('這一塊是空的，沒有東西可以複製', 2000); return; }
   const before = view.state.selection;
-  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, grip.pos)));
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)));
   view.focus();
   let ok = false;
   try { ok = document.execCommand('copy'); } catch { ok = false; }
@@ -271,7 +289,7 @@ function copyBlock() {
   else toast('這一塊已選取，請按 Ctrl+C 複製');
 }
 function makeGrip() {
-  const copy = el('button', { class: 'gutter-btn', tabindex: '-1', title: '複製整塊（含格式）', 'aria-label': '複製整塊', onclick: copyBlock });
+  const copy = el('button', { class: 'gutter-btn', tabindex: '-1', title: '複製整塊，含格式（Ctrl+Shift+C）', 'aria-label': '複製整塊', onclick: () => copyBlock() });
   copy.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" class="line"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5.5a2 2 0 00-2-2H5.5a2 2 0 00-2 2V11a2 2 0 002 2H7"/></svg>';
   copy.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   const g = el('button', { class: 'gutter-btn grip', tabindex: '-1', draggable: 'true', title: '拖曳搬動這一塊；點一下選取整塊（Alt+↑↓ 也能搬）', 'aria-label': '拖曳搬動這一塊' });
@@ -380,6 +398,13 @@ async function pasteUrl(url) {
   if (found) editor.view.dispatch(editor.state.tr.replaceWith(found.from, found.to, editor.schema.text(title, found.marks)));
 }
 
+function openNode(node) {
+  const rel = node.type.name === 'fileChip' ? node.attrs.rel : node.type.name === 'image' ? state.urlToRel[node.attrs.src] : '';
+  if (!rel) return false;
+  dump.openFile(state.date, rel).then((err) => { if (err) toast(`打不開這個檔案，頁面上的內容沒有變動。（${err}）`, 5000, true); });
+  return true;
+}
+
 function makeEditor(doc) {
   hideGrip(); closeSlash(); pendingMark = null;
   if (editor) editor.destroy();
@@ -408,7 +433,7 @@ function makeEditor(doc) {
         const real = files.filter((f) => dump.pathFor(f));
         // 從檔案總管複製的檔案一定收；截圖只在沒有文字時收（Excel 複製格子會同時帶一張圖）。
         if (real.length || (files.length && !text.trim())) {
-          insertFiles(real.length ? real : files).catch((err) => toast(`沒存成功：${err.message || err}`));
+          insertFiles(real.length ? real : files).catch((err) => toast(`檔案沒放進來，這一頁其他內容沒有變動。（${err.message || err}）`, 6000, true));
           return true;
         }
         if (BARE_URL.test(text.trim()) && view.state.selection.empty) { pasteUrl(text.trim()); return true; }
@@ -418,7 +443,7 @@ function makeEditor(doc) {
         if (moved || !event.dataTransfer || !event.dataTransfer.files.length) return false;
         const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
         event.preventDefault();
-        insertFiles([...event.dataTransfer.files], at ? at.pos : null).catch((err) => toast(`沒存成功：${err.message || err}`));
+        insertFiles([...event.dataTransfer.files], at ? at.pos : null).catch((err) => toast(`檔案沒放進來，這一頁其他內容沒有變動。（${err.message || err}）`, 6000, true));
         return true;
       },
       handleClick(_view, _pos, event) {
@@ -428,14 +453,12 @@ function makeEditor(doc) {
         dump.openUrl(a.getAttribute('href'));
         return true;
       },
-      handleDoubleClickOn(_view, _pos, node) {
-        const rel = node.type.name === 'fileChip' ? node.attrs.rel : node.type.name === 'image' ? state.urlToRel[node.attrs.src] : '';
-        if (!rel) return false;
-        dump.openFile(state.date, rel).then((err) => { if (err) toast(`打不開：${err}`); });
-        return true;
-      },
+      handleDoubleClickOn(_view, _pos, node) { return openNode(node); },
       handleKeyDown(_view, event) {
         if (slashKey(event)) { event.preventDefault(); return true; }
+        const sel = editor.state.selection;
+        if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && sel instanceof NodeSelection && openNode(sel.node)) { event.preventDefault(); return true; }
+        if (event.ctrlKey && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') { event.preventDefault(); copyBlock(currentBlockPos()); return true; }
         if (event.altKey && !event.ctrlKey && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
           event.preventDefault();
           return moveBlock(event.key === 'ArrowUp' ? -1 : 1);
@@ -471,7 +494,7 @@ function renderWeek() {
     const d = fromKey(k);
     const cls = ['day', k === state.date && 'current', k === state.today && 'today', state.counts[k] && 'has', (d.getDay() === 0 || d.getDay() === 6) && 'weekend'].filter(Boolean).join(' ');
     wrap.append(el('button', {
-      class: cls, role: 'tab', 'aria-selected': k === state.date ? 'true' : 'false',
+      class: cls, role: 'tab', 'aria-selected': k === state.date ? 'true' : 'false', tabindex: k === state.date ? '0' : '-1', 'data-key': k,
       title: `${fmtDate(k)} ${WEEKDAYS[d.getDay()]}${state.counts[k] ? '（有東西）' : ''}`,
       onclick: () => goTo(k),
     }, el('span', { text: SHORT[d.getDay()] }), el('b', { text: String(d.getDate()) })));
@@ -490,7 +513,7 @@ function setSaveState(text, bad) { const n = $('saveState'); n.textContent = tex
 
 async function refreshCounts() { state.counts = await dump.counts(); renderWeek(); if (!$('calendar').hidden) renderCalendar(); }
 
-async function load(find) {
+async function load(find, stay) {
   state.loading = true;
   const data = await dump.getPage(state.date);
   state.relToUrl = {}; state.urlToRel = {};
@@ -507,17 +530,26 @@ async function load(find) {
     window.getSelection().removeAllRanges();
     editor.commands.focus('start');
     try { window.find(find, false, false, true); } catch { /* 找不到就停在頁首 */ }
+  } else if (stay) {
+    const cur = $('week').querySelector('.day.current');
+    if (cur) cur.focus();
   } else {
     focusEditor();
     if (state.date === state.today) page.scrollTop = page.scrollHeight;
   }
 }
 
-async function goTo(k, find) {
+async function goTo(k, find, stay) {
   await flush();
   state.date = k;
-  await load(find);
+  await load(find, stay);
 }
+$('week').addEventListener('keydown', (e) => {
+  const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+  if (!step || e.altKey || e.ctrlKey) return;
+  e.preventDefault(); e.stopPropagation();
+  goTo(addDays(state.date, step), null, true);
+});
 function goToday() { state.today = toKey(new Date()); return goTo(state.today); }
 
 async function pickFiles() {
@@ -529,7 +561,7 @@ async function pickFiles() {
 }
 $('attachBtn').addEventListener('click', pickFiles);
 
-const overlayOpen = () => !$('searchPanel').hidden || !$('settingsPanel').hidden;
+const overlayOpen = () => !$('searchPanel').hidden || !$('settingsPanel').hidden || !$('keysPanel').hidden;
 
 // 點頁面下方的空白處，游標就到最後
 page.addEventListener('mousedown', (e) => { if (e.target === page) { e.preventDefault(); focusEditor(); } });
@@ -551,7 +583,7 @@ window.addEventListener('drop', (e) => {
   if (overlayOpen()) return;
   const doc = editor.state.doc; const last = doc.lastChild;
   const end = last && last.type.name === 'paragraph' && !last.content.size ? doc.content.size - last.nodeSize : doc.content.size;
-  insertFiles([...e.dataTransfer.files], end).catch((err) => toast(`沒存成功：${err.message || err}`));
+  insertFiles([...e.dataTransfer.files], end).catch((err) => toast(`檔案沒放進來，這一頁其他內容沒有變動。（${err.message || err}）`, 6000, true));
 });
 
 /* ---------- 格式選單 ---------- */
@@ -568,11 +600,22 @@ const FORMATS = [
   ['程式碼區塊', '```', (c) => c.toggleCodeBlock(), (e) => e.isActive('codeBlock'), 'code'],
   ['分隔線', '---', (c) => c.setHorizontalRule(), () => false, 'hr line divider'],
   null,
-  ['粗體', 'Ctrl+B', (c) => c.toggleBold(), (e) => e.isActive('bold'), 'bold b'],
-  ['斜體', 'Ctrl+I', (c) => c.toggleItalic(), (e) => e.isActive('italic'), 'italic i'],
-  ['刪除線', 'Ctrl+Shift+S', (c) => c.toggleStrike(), (e) => e.isActive('strike'), 'strike'],
-  ['插入現在時間', 'Alt+T', (c) => { const n = new Date(); return c.insertContent(`${pad(n.getHours())}:${pad(n.getMinutes())} `); }, () => false, 'time now shijian'],
+  ['粗體', 'Ctrl B', (c) => c.toggleBold(), (e) => e.isActive('bold'), 'bold b'],
+  ['斜體', 'Ctrl I', (c) => c.toggleItalic(), (e) => e.isActive('italic'), 'italic i'],
+  ['刪除線', 'Ctrl Shift S', (c) => c.toggleStrike(), (e) => e.isActive('strike'), 'strike'],
+  ['插入現在時間', 'Alt T', (c) => { const n = new Date(); return c.insertContent(`${pad(n.getHours())}:${pad(n.getMinutes())} `); }, () => false, 'time now shijian'],
 ];
+// 選單與月曆貼在叫出它的按鈕下面（頂列在窄視窗會變兩排，位置不能寫死）
+function anchor(box, btn) {
+  const r = btn.getBoundingClientRect();
+  const top = Math.round(r.bottom + 6);
+  // 靠右對齊按鈕；視窗太窄、左邊會被切掉時往右推回來
+  const right = Math.min(Math.round(window.innerWidth - r.right), window.innerWidth - box.offsetWidth - 8);
+  box.style.top = `${top}px`;
+  box.style.right = `${Math.max(8, right)}px`;
+  box.style.maxHeight = `${window.innerHeight - top - 8}px`;
+  box.style.overflowY = 'auto';
+}
 function openFormat() {
   closeCalendar();
   const menu = $('formatMenu');
@@ -584,7 +627,11 @@ function openFormat() {
     menu.append(el('button', { role: 'menuitemcheckbox', 'aria-checked': on ? 'true' : 'false', class: on ? 'on' : '', onclick: () => { closeFormat(); run(editor.chain().focus()).run(); } },
       el('span', { text: label }), hint ? el('kbd', { text: hint }) : null));
   }
+  menu.append(el('hr'));
+  menu.append(el('button', { role: 'menuitem', onclick: () => { closeFormat(); editor.commands.focus(); copyBlock(currentBlockPos()); } }, el('span', { text: '複製這一塊' }), el('kbd', { text: 'Ctrl Shift C' })));
+  menu.append(el('button', { role: 'menuitem', onclick: () => { closeFormat(); openKeys(); } }, el('span', { text: '快捷鍵一覽' }), el('kbd', { text: 'Ctrl /' })));
   menu.hidden = false;
+  anchor(menu, $('formatBtn'));
   $('formatBtn').setAttribute('aria-expanded', 'true');
 }
 function closeFormat() { $('formatMenu').hidden = true; $('formatBtn').setAttribute('aria-expanded', 'false'); }
@@ -675,20 +722,48 @@ function renderCalendar() {
     const k = toKey(d);
     const n = state.counts[k] || 0;
     const cls = [d.getMonth() !== m && 'other', k === state.today && 'today', k === state.date && 'current', n && 'has'].filter(Boolean).join(' ');
-    grid.append(el('button', { class: cls, title: `${fmtDate(k)}${n ? `，${n} 筆` : ''}`, 'aria-label': `${fmtDate(k)}${n ? `，${n} 筆` : ''}`, onclick: () => { closeCalendar(); goTo(k); } }, String(d.getDate())));
+    const label = `${fmtDate(k)} ${WEEKDAYS[d.getDay()]}${n ? '，有東西' : ''}`;
+    grid.append(el('button', { class: cls, title: label, 'aria-label': label, 'data-key': k, tabindex: k === state.calFocus ? '0' : '-1', onclick: () => { closeCalendar(); goTo(k); } }, String(d.getDate())));
   }
 }
+function focusCalDay(k) {
+  const d = fromKey(k);
+  state.calFocus = k;
+  if (d.getFullYear() !== state.calMonth[0] || d.getMonth() !== state.calMonth[1]) state.calMonth = [d.getFullYear(), d.getMonth()];
+  renderCalendar();
+  const cell = $('calGrid').querySelector(`[data-key="${k}"]`);
+  if (cell) cell.focus();
+}
+$('calGrid').addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey) return;
+  const cur = state.calFocus || state.date;
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+  let next = null;
+  if (step) next = addDays(cur, step);
+  else if (e.key === 'PageUp' || e.key === 'PageDown') { const d = fromKey(cur); d.setMonth(d.getMonth() + (e.key === 'PageUp' ? -1 : 1)); next = toKey(d); }
+  else if (e.key === 'Home') next = state.today;
+  if (!next) return;
+  e.preventDefault(); e.stopPropagation();
+  focusCalDay(next);
+});
 function openCalendar() {
   closeFormat();
   const d = fromKey(state.date);
   state.calMonth = [d.getFullYear(), d.getMonth()];
   $('calendar').hidden = false;
-  renderCalendar();
-  const cur = $('calGrid').querySelector('.current');
-  if (cur) cur.focus();
+  anchor($('calendar'), $('calBtn'));
+  $('calBtn').setAttribute('aria-expanded', 'true');
+  focusCalDay(state.date);
 }
-function closeCalendar() { $('calendar').hidden = true; }
-function shiftMonth(n) { const d = new Date(state.calMonth[0], state.calMonth[1] + n, 1); state.calMonth = [d.getFullYear(), d.getMonth()]; renderCalendar(); }
+function closeCalendar() { $('calendar').hidden = true; $('calBtn').setAttribute('aria-expanded', 'false'); }
+function shiftMonth(n) {
+  const d = new Date(state.calMonth[0], state.calMonth[1] + n, 1);
+  state.calMonth = [d.getFullYear(), d.getMonth()];
+  // 換月後讓鍵盤停點落在這個月：原本那天還在這個月就留著，不然停在 1 號
+  const f = fromKey(state.calFocus || state.date);
+  if (f.getFullYear() !== d.getFullYear() || f.getMonth() !== d.getMonth()) state.calFocus = toKey(d);
+  renderCalendar();
+}
 $('calBtn').addEventListener('click', () => ($('calendar').hidden ? openCalendar() : closeCalendar()));
 $('calPrev').addEventListener('click', () => shiftMonth(-1));
 $('calNext').addEventListener('click', () => shiftMonth(1));
@@ -737,7 +812,7 @@ async function runSearch() {
 }
 function openSearch() {
   closeCalendar(); closeFormat();
-  $('settingsPanel').hidden = true;
+  $('settingsPanel').hidden = true; $('keysPanel').hidden = true;
   $('searchPanel').hidden = false;
   $('searchInput').focus(); $('searchInput').select();
   runSearch();
@@ -759,7 +834,7 @@ $('searchResults').addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' && i === 0) $('searchInput').focus();
   else (items[i + (e.key === 'ArrowDown' ? 1 : -1)] || items[i]).focus();
 });
-for (const id of ['searchPanel', 'settingsPanel']) {
+for (const id of ['searchPanel', 'settingsPanel', 'keysPanel']) {
   $(id).addEventListener('mousedown', (e) => { if (e.target === $(id)) { $(id).hidden = true; focusEditor(); } });
 }
 
@@ -774,12 +849,21 @@ function showSettings(s) {
 }
 async function openSettings() {
   closeCalendar(); closeFormat();
-  $('searchPanel').hidden = true;
+  $('searchPanel').hidden = true; $('keysPanel').hidden = true;
   showSettings(await dump.getSettings());
   $('settingsPanel').hidden = false;
   $('settingsClose').focus();
 }
 function closeSettings() { $('settingsPanel').hidden = true; focusEditor(); }
+function openKeys() {
+  closeCalendar(); closeFormat();
+  $('searchPanel').hidden = true; $('settingsPanel').hidden = true;
+  $('keysPanel').hidden = false;
+  $('keysClose').focus();
+}
+function closeKeys() { $('keysPanel').hidden = true; focusEditor(); }
+$('keysOpen').addEventListener('click', openKeys);
+$('keysClose').addEventListener('click', closeKeys);
 async function patchSettings(patch) {
   const r = await dump.setSettings(patch);
   showSettings(r.settings);
@@ -826,11 +910,13 @@ document.addEventListener('keydown', (e) => {
     else if (!$('calendar').hidden) { closeCalendar(); focusEditor(); }
     else if (!$('searchPanel').hidden) closeSearch();
     else if (!$('settingsPanel').hidden) closeSettings();
+    else if (!$('keysPanel').hidden) closeKeys();
     else flush().then(() => dump.hide());
     return;
   }
   if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); openSearch(); return; }
   if (ctrl && e.key === ',') { e.preventDefault(); openSettings(); return; }
+  if (ctrl && e.key === '/') { e.preventDefault(); if ($('keysPanel').hidden) openKeys(); else closeKeys(); return; }
   if (overlayOpen()) return;
   if (ctrl && e.key.toLowerCase() === 't') { e.preventDefault(); goToday(); }
   else if (ctrl && e.key.toLowerCase() === 'g') { e.preventDefault(); $('calendar').hidden ? openCalendar() : closeCalendar(); }
@@ -843,7 +929,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 主程序來的訊息 ---------- */
-dump.on('go-today', () => { $('searchPanel').hidden = true; $('settingsPanel').hidden = true; closeCalendar(); goToday(); });
+dump.on('go-today', () => { $('searchPanel').hidden = true; $('settingsPanel').hidden = true; $('keysPanel').hidden = true; closeCalendar(); goToday(); });
 dump.on('open-settings', openSettings);
 dump.on('vault:changed', async () => { state.dirty = false; await refreshCounts(); await load(); });
 dump.on('flush', () => { flush().then(() => { if (dump.flushed) dump.flushed(); }); });
@@ -855,7 +941,7 @@ window.addEventListener('focus', () => {
 });
 
 /* ---------- 開始 ---------- */
-Object.assign(window, { state, goTo, flush, openSearch, openSettings, closeSettings, openCalendar, closeCalendar, runSearch, getEditor: () => editor, placeGrip, grip, openFormat, closeFormat, slash, copyBlock, lastEditAt });
+Object.assign(window, { state, goTo, flush, openSearch, openSettings, closeSettings, openCalendar, closeCalendar, runSearch, getEditor: () => editor, placeGrip, grip, openFormat, closeFormat, slash, copyBlock, lastEditAt, openKeys, closeKeys });
 (async function start() {
   state.counts = await dump.counts();
   await load();
