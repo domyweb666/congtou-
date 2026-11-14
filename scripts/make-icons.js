@@ -8,6 +8,8 @@ const fs = require('fs'); const path = require('path');
 const assets = path.join(__dirname, '..', 'assets');
 const svg = fs.readFileSync(path.join(assets, 'icon.svg'), 'utf8');
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
+const INSET = 0.04;   // 四周留白，佔邊長的比例
+const RADIUS = 0.22;  // 圓角半徑，佔方塊邊長的比例
 
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
@@ -21,7 +23,10 @@ app.whenReady().then(async () => {
       img.onload = () => {
         const c = document.createElement('canvas'); c.width = ${size}; c.height = ${size};
         const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
-        g.drawImage(img, 0, 0, ${size}, ${size});
+        // 桌面圖示：四周留一點邊、切成圓角方塊，在工作列上才不會是一塊滿版的方形
+        const pad = ${size} * ${INSET}; const side = ${size} - pad * 2;
+        g.beginPath(); g.roundRect(pad, pad, side, side, side * ${RADIUS}); g.clip();
+        g.drawImage(img, pad, pad, side, side);
         resolve(c.toDataURL('image/png'));
       };
       img.onerror = () => reject(new Error('SVG 畫不出來'));
