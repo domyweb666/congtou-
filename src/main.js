@@ -232,7 +232,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => showWindow(true));
   app.whenReady().then(() => {
-    if (process.platform === 'win32') app.setAppUserModelId('org.domyweb.dailydump');
+    if (process.platform === 'win32') app.setAppUserModelId('org.domyweb.congcongdiu');
     loadSettings();
     store = new Store(settings.vaultPath);
     registerIpc();

@@ -1,0 +1,40 @@
+# 打包設定：npm run pack:win 做 Windows 安裝檔，npm run pack:mac 做 Mac 的 dmg（要在 Mac 上跑）
+appId: org.domyweb.congcongdiu
+productName: 蔥蔥丟
+directories:
+  output: dist
+# 介面已經先打包成 src/renderer/app.js，所以不用帶 node_modules，也不帶原始的 app.src.js
+files:
+  - src/**/*
+  - "!src/renderer/app.src.js"
+  - assets/**/*
+  - package.json
+npmRebuild: false
+publish: null
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+
+# Windows 安裝程式：裝在使用者自己的資料夾，不用系統管理員權限
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 蔥蔥丟
+  language: "1028"
+  artifactName: congcongdiu-${version}-win-x64-setup.${ext}
+
+mac:
+  icon: assets/icon.icns
+  category: public.app-category.productivity
+  # 沒有 Apple 開發者簽章，簽成本機簽章，M 系列晶片才肯執行
+  identity: "-"
+  artifactName: congcongdiu-${version}-mac-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [arm64, x64]

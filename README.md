@@ -36,6 +36,8 @@
 
 抓手可以拖曳搬動，放開會落在綠線的位置。Alt+↑、Alt+↓ 也能搬。
 
+每一塊的右邊有一個淡淡的編號，從上往下數。空白段落和時間線不算。視窗很窄時編號會收起來。
+
 ![拖曳搬動一塊時，綠線標出放開後會落在哪裡](docs/img/move.png)
 
 ### 找以前丟的
@@ -103,23 +105,31 @@ Ctrl+F 會搜尋所有日子，多個字用空格分開。點結果會跳到那�
 
 ## 安裝
 
+打包好的檔案在 [Releases](https://github.com/domyweb666/congtou-/releases)。
+
 ### Windows
+
+下載 `congcongdiu-版號-win-x64-setup.exe`，執行後照畫面按下一步。裝在自己的使用者資料夾，不用系統管理員權限；裝完桌面和開始功能表會有「蔥蔥丟」。要移除就到「設定 → 應用程式」裡解除安裝，垃圾庫裡的資料不會被刪。
+
+安裝檔沒有程式碼簽章，Windows 可能跳出「Windows 已保護您的電腦」，按「其他資訊」再按「仍要執行」。
+
+自己打包：
 
 ```
 npm install
 npm run pack:win
 ```
 
-打包好的程式在 `dist/蔥蔥丟-win32-x64/`，執行裡面的 `蔥蔥丟.exe`。整個資料夾可以搬到別的地方，不用安裝。
+安裝檔會在 `dist/`，旁邊的 `dist/win-unpacked/` 是不用安裝、直接執行的版本。
 
 ### Mac
 
-Mac 版要在 Mac 上打包（在 Windows 上打包出來的 `.app` 會壞掉）。這個 repo 有一支 GitHub Actions 幫忙做：到 Actions 頁籤選「打包」，按 Run workflow，跑完在那一次執行的頁面最下面下載 `mac` 壓縮檔。裡面有兩個版本：
+下載對應晶片的 `.dmg`，打開後把「蔥蔥丟」拖進「應用程式」：
 
-- `蔥蔥丟-darwin-arm64.zip`：M 系列晶片的 Mac
-- `蔥蔥丟-darwin-x64.zip`：Intel 的 Mac
+- `congcongdiu-版號-mac-arm64.dmg`：M 系列晶片的 Mac
+- `congcongdiu-版號-mac-x64.dmg`：Intel 的 Mac
 
-自己有 Mac 的話，直接跑 `npm install` 和 `npm run pack:mac` 也可以。
+Mac 版要在 Mac 上打包。這個 repo 有一支 GitHub Actions 幫忙做：到 Actions 頁籤選「打包」，按 Run workflow，跑完在那一次執行的頁面最下面下載。自己有 Mac 的話，直接跑 `npm install` 和 `npm run pack:mac` 也可以。
 
 這個 app 沒有 Apple 開發者簽章，第一次打開 macOS 會擋。對 `蔥蔥丟.app` 按右鍵選「打開」，再按一次「打開」。還是打不開就在終端機跑：
 
@@ -137,8 +147,8 @@ npm start        # 打包介面後執行
 npm test         # 儲存層檢查
 npm run web      # 產生網頁版，並更新 docs/index.html（GitHub Pages 用）
 npm run icons    # 從 assets/icon.svg 重新產生 icon.png、tray.png、icon.ico、icon.icns
-npm run pack:win # 打包 Windows 版到 dist/
-npm run pack:mac # 打包 Mac 版到 dist/（要在 Mac 上跑）
+npm run pack:win # 做 Windows 安裝檔到 dist/
+npm run pack:mac # 做 Mac 的 dmg 到 dist/（要在 Mac 上跑）
 ```
 
 整個 app 跑一輪並截圖（本頁的附圖就是這樣拍的，用的是暫存資料夾，不會碰你的垃圾庫）：
@@ -168,6 +178,7 @@ scripts/               測試、冒煙測試、網頁版、圖示
 web/                   網頁預覽版用的替身（用瀏覽器儲存空間代替資料夾）
 docs/                  GitHub Pages 的網頁預覽版，還有這一頁的附圖
 .uiux-win/             設計紀錄：核心動作卡、審查紀錄、閘門紀錄
+electron-builder.yml   安裝檔的打包設定
 ```
 
 ## 介面的規矩

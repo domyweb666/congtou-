@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self'">
 <title>蔥蔥丟 網頁預覽版</title>
 <style>
 /* 由 domy-design/scripts/build-css.mjs 從 tokens/desktop.json 產生,不要手改。
@@ -158,6 +158,7 @@
   --doc-w: 720px;
   --gutter-w: 54px;
   --doc-top: 40px;
+  --num-w: 36px;
 }
 :root[data-theme='dark'] { --scrim: rgba(0, 0, 0, 0.5); }
 
@@ -229,7 +230,7 @@ kbd {
 }
 
 /* ---------- 這一天 ---------- */
-main { flex: 1; overflow-y: auto; padding: var(--doc-top) var(--sp-6) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
+main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + var(--sp-4)) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
 
 /* 這一天的文件 */
 .doc { max-width: var(--doc-w); margin: 0 auto; position: relative; font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
@@ -253,6 +254,14 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) var(--sp-6) 0 calc(var
 .doc .ProseMirror > .timemark:first-child::after { content: none; }
 .doc .ProseMirror { outline: none; min-height: 50vh; padding-bottom: 30vh; overflow-wrap: anywhere; }
 .doc .ProseMirror > * + * { margin-top: .55em; }
+/* 右邊的段落編號：每一塊一個號碼，淡淡的，不搶內容。空白段落與時間標記不算 */
+.doc .ProseMirror { counter-reset: blk; }
+.doc .ProseMirror > *:not(.timemark):not(:has(> br.ProseMirror-trailingBreak:only-child)) { counter-increment: blk; position: relative; }
+.doc .ProseMirror > *:not(.timemark):not(:has(> br.ProseMirror-trailingBreak:only-child))::before {
+  content: counter(blk); position: absolute; top: 0; right: calc(var(--num-w) * -1); width: var(--num-w);
+  text-align: right; color: var(--ap-text-3); font-size: var(--fs-caption); font-weight: 400; line-height: inherit;
+  font-variant-numeric: tabular-nums; user-select: none; pointer-events: none;
+}
 .doc p { margin: 0; }
 .doc h1, .doc h2, .doc h3, .doc h4 { margin: 1.1em 0 .2em; line-height: 1.35; font-weight: 700; color: var(--ap-text); }
 .doc h1 { font-size: 1.55em; }
@@ -414,6 +423,8 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) var(--sp-6) 0 calc(var
 @media (max-width: 620px) {
   main { padding: var(--sp-8) var(--sp-3) 0 calc(var(--gutter-w) + var(--sp-1)); }
   .keys td:first-child { width: auto; white-space: normal; }
+  /* 窄視窗沒有位置放編號 */
+  .doc .ProseMirror > *:not(.is-editor-empty)::before { display: none; }
 }
 @media (max-width: 460px) {
   .btn.date .weekday { display: none; }

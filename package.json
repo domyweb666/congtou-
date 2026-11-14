@@ -1,5 +1,5 @@
 {
-  "name": "daily-dump",
+  "name": "congcongdiu",
   "productName": "蔥蔥丟",
   "version": "0.4.0",
   "description": "寫作時的剪下暫存區：每天一頁，把剪掉的段落先丟進來，幾天內要用再撈回去。",
@@ -12,13 +12,12 @@
     "test": "node scripts/test-store.js",
     "icons": "electron scripts/make-icons.js",
     "pack": "npm run pack:win",
-    "pack:win": "npm run build && electron-packager . \"蔥蔥丟\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icon.ico --ignore=\"^/(dist|docs|scripts|web|shots|\\.uiux-win|\\.github|\\.claude|node_modules)\" --ignore=\"app\\.src\\.js$\"",
-    "pack:mac": "npm run build && electron-packager . \"蔥蔥丟\" --platform=darwin --arch=arm64,x64 --out=dist --overwrite --icon=assets/icon.icns --app-bundle-id=org.domyweb.congcongdiu --ignore=\"^/(dist|docs|scripts|web|shots|\\.uiux-win|\\.github|\\.claude|node_modules)\" --ignore=\"app\\.src\\.js$\"",
+    "pack:win": "npm run build && electron-builder --win --publish never",
+    "pack:mac": "npm run build && electron-builder --mac --publish never",
     "build": "esbuild src/renderer/app.src.js --bundle --format=iife --minify --target=chrome120 --outfile=src/renderer/app.js",
     "web": "npm run build && node scripts/build-web.js && node -e \"require('fs').copyFileSync('web/index.html','docs/index.html')\""
   },
   "devDependencies": {
-    "@electron/packager": "^20.3.0",
     "@tiptap/core": "^2.27.3",
     "@tiptap/extension-image": "^2.27.3",
     "@tiptap/extension-link": "^2.27.3",
@@ -32,6 +31,7 @@
     "@tiptap/pm": "^2.27.3",
     "@tiptap/starter-kit": "^2.27.3",
     "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "tiptap-markdown": "^0.8.10"
   }
