@@ -1,0 +1,51 @@
+name: 打包
+
+# 手動按 Run workflow 才跑，或推一個 v 開頭的標籤（例：v0.4.0）。平常 push 不會跑。
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
+      - run: npm run pack:mac
+      - name: 簽成本機簽章並壓縮
+        run: |
+          cd dist
+          for d in *-darwin-*; do
+            # 沒有 Apple 開發者簽章，至少簽成本機簽章，M 系列晶片才肯執行
+            codesign --force --deep --sign - "$d/蔥蔥丟.app"
+            # ditto 會保留 .app 裡的捷徑與執行權限，一般的 zip 不會
+            ditto -c -k --sequesterRsrc --keepParent "$d/蔥蔥丟.app" "$d.zip"
+          done
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/*.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
+      - run: npm run pack:win
+      - name: 壓縮
+        shell: pwsh
+        run: Compress-Archive -Path "dist/蔥蔥丟-win32-x64" -DestinationPath "dist/蔥蔥丟-win32-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip

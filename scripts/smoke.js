@@ -4,12 +4,16 @@ const fs = require('fs'); const os = require('os'); const path = require('path')
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dd-smoke-'));
 process.env.DAILY_DUMP_USERDATA = path.join(tmp, 'user');
 app.setPath('documents', path.join(tmp, 'docs'));
+// 視窗被別的視窗蓋住時 Windows 會停止重畫，截圖就會拍到舊畫面；測試時關掉這個省電機制
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 const errors = [];
 require('../src/main.js');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
   await wait(1800);
   const win = BrowserWindow.getAllWindows()[0];
+  win.webContents.setBackgroundThrottling(false);
   // 0. 真的打字：「# 」要變標題，「- 」要變項目符號
   win.focus(); win.webContents.focus();
   for (const t of ['# ', '今天的大標題', '\n', '- ', '第一個項目', '\n', '第二個項目']) {
@@ -21,7 +25,7 @@ app.whenReady().then(async () => {
   await wait(200);
   win.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 'warning') errors.push(e.message); });
   const js = (code) => win.webContents.executeJavaScript(code, true);
-  const shot = async (name) => { await wait(400); fs.writeFileSync(path.join(__dirname, '..', 'shots', name + '.png'), (await win.webContents.capturePage()).toPNG()); };
+  const shot = async (name) => { await wait(500); win.webContents.invalidate(); await wait(250); fs.writeFileSync(path.join(__dirname, '..', 'shots', name + '.png'), (await win.webContents.capturePage()).toPNG()); };
   const png = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png')).resize({ width: 96 }).toPNG();
   const pdf = path.join(tmp, '第三季報價單.pdf'); fs.writeFileSync(pdf, Buffer.alloc(234567));
   await js(`(async()=>{
@@ -50,8 +54,8 @@ app.whenReady().then(async () => {
   console.log('link text', await js(`[...document.querySelectorAll('.doc a')].map(a=>a.textContent).join('|')`));
   await js('document.getElementById("page").scrollTop=0'); await shot('1-top');
   await js('document.getElementById("page").scrollTop=430'); await shot('2-middle');
-  const day = fs.readdirSync(path.join(tmp, 'docs', '蔥頭'))[0];
-  const dayDir = path.join(tmp, 'docs', '蔥頭', day, fs.readdirSync(path.join(tmp, 'docs', '蔥頭', day))[0]);
+  const day = fs.readdirSync(path.join(tmp, 'docs', '蔥蔥丟'))[0];
+  const dayDir = path.join(tmp, 'docs', '蔥蔥丟', day, fs.readdirSync(path.join(tmp, 'docs', '蔥蔥丟', day))[0]);
   console.log('files', fs.readdirSync(dayDir, { recursive: true }).join(', '));
   console.log('--- index.md ---\n' + fs.readFileSync(path.join(dayDir, 'index.md'), 'utf8'));
   const saved = fs.readFileSync(path.join(dayDir, 'page.json'), 'utf8');

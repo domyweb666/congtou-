@@ -2,12 +2,14 @@
 //   assets/icon.png  256×256，視窗與工作列用
 //   assets/tray.png  32×32，系統匣用
 //   assets/icon.ico  16、24、32、48、64、128、256，打包成 exe 時用
+//   assets/icon.icns 16 到 1024，打包成 Mac 的 .app 時用
 // 用 Electron 自己的瀏覽器畫 SVG，不用另外裝轉檔套件。
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs'); const path = require('path');
 const assets = path.join(__dirname, '..', 'assets');
 const svg = fs.readFileSync(path.join(assets, 'icon.svg'), 'utf8');
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
+const MAC = { icp4: 16, icp5: 32, icp6: 64, ic07: 128, ic08: 256, ic09: 512, ic10: 1024 };
 const INSET = 0.04;   // 四周留白，佔邊長的比例
 const RADIUS = 0.22;  // 圓角半徑，佔方塊邊長的比例
 
@@ -17,7 +19,7 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 300, height: 300, webPreferences: { offscreen: true } });
   await win.loadURL('about:blank');
   const pngs = {};
-  for (const size of SIZES) {
+  for (const size of [...SIZES, 512, 1024]) {
     const dataUrl = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -47,6 +49,10 @@ app.whenReady().then(async () => {
     offset += pngs[size].length; dir.push(e);
   }
   fs.writeFileSync(path.join(assets, 'icon.ico'), Buffer.concat([head, ...dir, ...SIZES.map((s) => pngs[s])]));
-  console.log('[make-icons] 已產生 icon.png、tray.png、icon.ico', SIZES.map((s) => `${s}:${pngs[s].length}`).join(' '));
+  // .icns：檔頭 'icns'＋總長度，每張圖是 4 個字的代號＋長度（含這 8 位元組）＋PNG
+  const parts = Object.entries(MAC).map(([type, size]) => { const h = Buffer.alloc(8); h.write(type, 0, 'ascii'); h.writeUInt32BE(pngs[size].length + 8, 4); return Buffer.concat([h, pngs[size]]); });
+  const top = Buffer.alloc(8); top.write('icns', 0, 'ascii'); top.writeUInt32BE(8 + parts.reduce((n, b) => n + b.length, 0), 4);
+  fs.writeFileSync(path.join(assets, 'icon.icns'), Buffer.concat([top, ...parts]));
+  console.log('[make-icons] 已產生 icon.png、tray.png、icon.ico、icon.icns', SIZES.map((s) => `${s}:${pngs[s].length}`).join(' '));
   app.exit(0);
 }).catch((err) => { console.error('[make-icons] 失敗', err); app.exit(1); });

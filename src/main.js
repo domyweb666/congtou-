@@ -4,7 +4,7 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { Store } = require('./store');
 
-const APP_NAME = '蔥頭';
+const APP_NAME = '蔥蔥丟';
 const DEFAULTS = {
   vaultPath: '',
   hotkey: 'Ctrl+Alt+D',
@@ -24,11 +24,19 @@ if (process.env.DAILY_DUMP_USERDATA) app.setPath('userData', process.env.DAILY_D
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function loadSettings() {
+  // 0.3 版叫「蔥頭」，設定存在另一個資料夾；第一次用新名字開的時候把舊設定搬過來（快捷鍵、垃圾庫位置、視窗大小）
+  if (!process.env.DAILY_DUMP_USERDATA && !fs.existsSync(settingsFile())) {
+    try {
+      const before = path.join(app.getPath('appData'), '蔥頭', 'settings.json');
+      if (fs.existsSync(before)) { fs.mkdirSync(path.dirname(settingsFile()), { recursive: true }); fs.copyFileSync(before, settingsFile()); }
+    } catch { /* 搬不了就用預設值 */ }
+  }
   try { settings = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; } catch { settings = { ...DEFAULTS }; }
   if (!settings.vaultPath) {
-    // 0.2 版以前叫 Daily Dump，舊資料夾還在就接著用
-    const old = path.join(app.getPath('documents'), 'DailyDump');
-    settings.vaultPath = fs.existsSync(old) ? old : path.join(app.getPath('documents'), '蔥頭');
+    // 以前叫過 Daily Dump、蔥頭，舊資料夾還在就接著用，不搬也不改名
+    const docs = app.getPath('documents');
+    const before = ['DailyDump', '蔥頭'].map((n) => path.join(docs, n)).find((p) => fs.existsSync(p));
+    settings.vaultPath = before || path.join(docs, APP_NAME);
   }
 }
 function saveSettings() {
@@ -109,7 +117,7 @@ function createTray() {
   tray = new Tray(nativeImage.createFromPath(asset('tray.png')));
   tray.setToolTip(`${APP_NAME}（${settings.hotkey || '未設定快捷鍵'}）`);
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打開蔥頭', click: () => showWindow(true) },
+    { label: `打開${APP_NAME}`, click: () => showWindow(true) },
     { label: '打開垃圾庫資料夾', click: () => shell.openPath(settings.vaultPath) },
     { label: '設定…', click: () => { showWindow(false); win.webContents.send('open-settings'); } },
     { type: 'separator' },

@@ -1,4 +1,4 @@
-/* 蔥頭的介面樣式。顏色、字級、間距、圓角、陰影、動畫時間只用 src/design/domy-desktop.css 的代號。
+/* 蔥蔥丟的介面樣式。顏色、字級、間距、圓角、陰影、動畫時間只用 src/design/domy-desktop.css 的代號。
    元件長相照 Domy 桌面設計系統（Button、Menu、Segmented、SearchField、Toast、Dialog）。
    不在階梯上的值只有三種：1px 以下的細線、36px 以上的版面尺寸、行內標「例外」的那幾行。 */
 :root {

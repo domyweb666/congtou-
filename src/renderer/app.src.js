@@ -506,7 +506,7 @@ function renderHeading() {
   $('dateTitle').textContent = thisYear ? fmtShort(state.date) : fmtDate(state.date);
   $('weekday').textContent = WEEKDAYS[d.getDay()];
   $('todayBadge').hidden = state.date !== state.today;
-  document.title = state.date === state.today ? '蔥頭' : `蔥頭 — ${fmtShort(state.date)}`;
+  document.title = state.date === state.today ? '蔥蔥丟' : `蔥蔥丟 — ${fmtShort(state.date)}`;
 }
 function setSaveState(text, bad) { const n = $('saveState'); n.textContent = text; n.classList.toggle('bad', !!bad); }
 

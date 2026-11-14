@@ -4,7 +4,7 @@ const r = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const safe = (js) => js.replace(/<\/script/gi, '<\\/script');
 let html = r('src/renderer/index.html');
 html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\n/, () => '<meta name="viewport" content="width=device-width, initial-scale=1">\n');
-html = html.replace('<title>蔥頭</title>', () => '<title>蔥頭 網頁預覽版</title>');
+html = html.replace('<title>蔥蔥丟</title>', () => '<title>蔥蔥丟 網頁預覽版</title>');
 // 樣式表全部塞進頁面：設計系統代號、產品色、介面樣式，順序照 index.html
 let sheets = 0;
 html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (_m, href) => { sheets++; return `<style>\n${r(path.posix.join('src/renderer', href))}\n</style>`; });
