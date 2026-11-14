@@ -1,5 +1,5 @@
 /* global dump */
-import { Editor, Node } from '@tiptap/core';
+import { Editor, Node, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
@@ -11,7 +11,8 @@ import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
 import { Markdown } from 'tiptap-markdown';
-import { NodeSelection, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, TextSelection, Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 const $ = (id) => document.getElementById(id);
 // 深色跟著系統走：設計系統的深色代號掛在 <html data-theme="dark">
@@ -112,6 +113,30 @@ const TimeMark = Node.create({
   renderHTML({ node }) { return ['div', { 'data-time-mark': node.attrs.time, 'data-at': String(node.attrs.at), class: 'timemark', title: '自動加上的時間標記；點一下選取後可按 Delete 刪掉' }, ['span', {}, node.attrs.time]]; },
   renderText() { return ''; },
   addStorage() { return { markdown: { serialize(st, node) { st.write(`〔${node.attrs.time}〕`); st.closeBlock(node); }, parse: {} } }; },
+});
+// 右邊的段落編號：只有「有內容的段落」才算一號。空行、只有換行或空白的段落、時間標記、分隔線都不算。
+const NO_NUM = new Set(['timeMark', 'horizontalRule']);
+function hasContent(node) {
+  if (NO_NUM.has(node.type.name)) return false;
+  if (node.isLeaf) return true;
+  if (/[^\s​﻿]/.test(node.textContent)) return true;
+  let found = false;
+  node.descendants((n) => { if (found) return false; if (n.isLeaf && !n.isText && n.type.name !== 'hardBreak') found = true; return !found; });
+  return found;
+}
+function numberDecos(doc) {
+  const decos = [];
+  doc.forEach((node, pos) => { if (hasContent(node)) decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'numbered' })); });
+  return DecorationSet.create(doc, decos);
+}
+const BlockNumbers = Extension.create({
+  name: 'blockNumbers',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      state: { init: (_c, st) => numberDecos(st.doc), apply: (tr, old) => (tr.docChanged ? numberDecos(tr.doc) : old) },
+      props: { decorations(st) { return this.getState(st); } },
+    })];
+  },
 });
 const MARK_GAP = 10 * 60 * 1000;
 const lastEditAt = {};
@@ -430,7 +455,7 @@ function makeEditor(doc) {
       BlockImage.configure({ inline: false, allowBase64: true }),
       TaskList, TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-      FileChip, TimeMark,
+      FileChip, TimeMark, BlockNumbers,
       Placeholder.configure({ placeholder: state.date === state.today ? '把剪下來的段落貼在這裡，或直接打字、拖檔案進來。打 / 放圖片、檔案，或換格式。' : `${fmtShort(state.date)} 這天沒有東西。直接打字或貼上就會記在這天。` }),
       Markdown.configure({ html: false, linkify: true, breaks: true, transformPastedText: true, transformCopiedText: false }),
     ],
