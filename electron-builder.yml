@@ -34,6 +34,8 @@ mac:
   category: public.app-category.productivity
   # 沒有 Apple 開發者簽章，簽成本機簽章，M 系列晶片才肯執行
   identity: "-"
+  # 本機簽章配上 hardened runtime 會讓 app 開不起來（要另外給權限檔）；沒有要送 Apple 公證，直接關掉
+  hardenedRuntime: false
   artifactName: congcongdiu-${version}-mac-${arch}.${ext}
   target:
     - target: dmg
