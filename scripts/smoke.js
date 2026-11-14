@@ -68,6 +68,20 @@ app.whenReady().then(async () => {
   console.log('found selection', JSON.stringify(await js('String(window.getSelection())')));
   await js('openSettings()'); await shot('5-settings'); await js('closeSettings()');
   win.setSize(360, 560); await wait(300); await js('document.getElementById("page").scrollTop=0'); await shot('6-narrow');
+  // 打「/」：選單第一項要是「圖片或檔案」
+  win.setSize(640, 760); await wait(300);
+  await js(`(()=>{const ed=getEditor(); ed.commands.focus('end'); ed.commands.insertContent('/');})()`); await wait(300); await shot('7-slash');
+  console.log('slash first', await js(`document.querySelector('#slashMenu button span')?.textContent`));
+  // 拖曳搬動一塊：落點那條線要看得見
+  await js(`(()=>{const ed=getEditor(); const v=ed.view; document.getElementById('page').scrollTop=0;
+    const blocks=[...v.dom.children]; const r=blocks[3].getBoundingClientRect(); placeGrip(blocks[1].getBoundingClientRect().top+4);
+    const sel=v.state.selection.constructor; const pos=v.posAtDOM(blocks[1],0)-1;
+    v.dragging={slice:v.state.doc.slice(pos, pos+v.state.doc.nodeAt(pos).nodeSize), move:true};
+    v.dom.dispatchEvent(new DragEvent('dragover',{clientX:r.left+20, clientY:r.top+1, bubbles:true, cancelable:true}));})()`);
+  await shot('9-dropline');
+  console.log('drop line', await js(`(()=>{const d=document.querySelector('.drop-line'); if(!d) return 'none'; const r=d.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height)+' '+getComputedStyle(d).backgroundColor})()`));
+  await js('getEditor().view.dragging=null');
+  await js('goTo("2026-01-01")'); await wait(500); await shot('8-other-day');
   console.log('errors', JSON.stringify(errors));
   app.exit(0);
 });

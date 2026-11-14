@@ -12,6 +12,7 @@
   --ctl-h: 32px;
   --doc-w: 720px;
   --gutter-w: 54px;
+  --doc-top: 40px;
 }
 :root[data-theme='dark'] { --scrim: rgba(0, 0, 0, 0.5); }
 
@@ -65,46 +66,28 @@ kbd {
 }
 .spacer { flex: 1; min-width: var(--sp-1); }
 .bar-sep { width: 1px; height: var(--sp-5); margin: 0 var(--sp-1); background: var(--ap-sep); flex: none; }
-.week {
-  display: flex; gap: var(--sp-0_5); min-width: 0; flex: 0 1 auto;
-  padding: var(--sp-0_5); border-radius: var(--r-md); background: var(--ap-fill);
+.btn.date { gap: var(--sp-2); padding: 0 var(--sp-2) 0 var(--sp-2_5); color: var(--ap-text); min-width: 0; flex: 0 1 auto; }
+.btn.date b { font-size: var(--fs-heading); font-weight: 600; white-space: nowrap; }
+.btn.date .weekday { color: var(--ap-text-2); font-size: var(--fs-small); font-weight: 400; }
+.btn.date .chev { width: 12px; height: 12px; color: var(--ap-text-3); }
+.badge {
+  padding: 1px var(--sp-2); border-radius: var(--r-full);
+  background: var(--ap-accent-bg); color: var(--ap-accent-deep); font-size: var(--fs-caption); font-weight: 600;
 }
-.day {
-  position: relative; width: 36px; height: 40px; padding: var(--sp-0_5) 0 0; flex: none;
-  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ap-text-2);
-  display: flex; flex-direction: column; align-items: center; line-height: 1.3;
-  transition: background var(--dur-base) ease, color var(--dur-base) ease;
-}
-.day span { font-size: var(--fs-caption); }
-.day b { font-size: var(--fs-body); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ap-text-body); }
-.day:hover { background: var(--ap-fill); }
-.day.weekend span { color: var(--ap-danger); }
-.day.today b { color: var(--ap-accent-text); }
-.day.current { background: var(--ap-surface); box-shadow: var(--ap-shadow-card); color: var(--ap-text); }
-.day.current b { color: var(--ap-text); }
-.day.current.today b { color: var(--ap-accent-text); }
-.day.has::after, .cal-grid button.has::after {
+#todayBtn { color: var(--ap-accent-text); }
+.ic.solid { fill: currentColor; stroke: none; }
+.save-state { margin-right: var(--sp-1); color: var(--ap-text-2); font-size: var(--fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.save-state.bad { color: var(--ap-danger); font-weight: 600; }
+.cal-grid button.has::after {
   content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px;
   border-radius: 50%; background: var(--ap-accent);
 }
 
 /* ---------- 這一天 ---------- */
-main { flex: 1; overflow-y: auto; padding: var(--sp-5) var(--sp-6) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
-.heading {
-  max-width: var(--doc-w); margin-inline: auto; padding-bottom: var(--sp-2_5); border-bottom: 1px solid var(--ap-sep-soft);
-  display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; cursor: default;
-}
-h1 { margin: 0; font-size: var(--fs-title); line-height: 1.4; font-weight: 700; color: var(--ap-text); }
-.weekday { color: var(--ap-text-2); font-size: var(--fs-small); }
-.badge {
-  align-self: center; padding: 1px var(--sp-2); border-radius: var(--r-full);
-  background: var(--ap-accent-bg); color: var(--ap-accent-deep); font-size: var(--fs-caption); font-weight: 600;
-}
-.save-state { margin-left: auto; color: var(--ap-text-2); font-size: var(--fs-small); }
-.save-state.bad { color: var(--ap-danger); font-weight: 600; }
+main { flex: 1; overflow-y: auto; padding: var(--doc-top) var(--sp-6) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
 
 /* 這一天的文件 */
-.doc { max-width: var(--doc-w); margin: var(--sp-4) auto 0; position: relative; font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
+.doc { max-width: var(--doc-w); margin: 0 auto; position: relative; font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
 .gutter { position: absolute; left: calc(var(--gutter-w) * -1); display: flex; gap: var(--sp-0_5); }
 .gutter-btn {
   width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ap-text-3);
@@ -122,6 +105,7 @@ h1 { margin: 0; font-size: var(--fs-title); line-height: 1.4; font-weight: 700; 
 }
 .doc .timemark::after { content: ""; flex: 1; border-top: 1px solid var(--ap-sep-soft); }
 .doc .ProseMirror > .timemark:first-child { margin-top: 0; }
+.doc .ProseMirror > .timemark:first-child::after { content: none; }
 .doc .ProseMirror { outline: none; min-height: 50vh; padding-bottom: 30vh; overflow-wrap: anywhere; }
 .doc .ProseMirror > * + * { margin-top: .55em; }
 .doc p { margin: 0; }
@@ -168,6 +152,9 @@ h1 { margin: 0; font-size: var(--fs-title); line-height: 1.4; font-weight: 700; 
 .doc .ProseMirror-gapcursor::after { border-top-color: var(--ap-text); }
 .doc p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--ap-text-3); float: left; height: 0; pointer-events: none; }
 .doc ::selection { background: var(--ap-accent-bg-hover); }
+
+/* 拖曳搬動一塊時，放開會落在哪裡的那條線 */
+.drop-line { background: var(--ap-accent); border-radius: var(--r-full); }
 
 /* ---------- 拖放 ---------- */
 .drop {
@@ -278,32 +265,22 @@ h1 { margin: 0; font-size: var(--fs-title); line-height: 1.4; font-weight: 700; 
   background: var(--ap-fill-hover); color: var(--ap-text-on-color); font-weight: 600;
 }
 
-/* ---------- 視窗變窄：週條跟著縮，不換排法 ---------- */
-/* 預設視窗寬 640：「格式」兩個字放不下，收成圖示 */
-@media (max-width: 700px) {
-  .btn-label { display: none; }
-}
+/* ---------- 視窗變窄：頂列只有一排，先收星期，再收「已儲存」 ---------- */
 @media (max-width: 620px) {
-  .week { flex: 1 1 0; }
-  .day { flex: 1 1 0; width: auto; min-width: 0; }
-  .spacer, .bar-sep, #prevWeek, #nextWeek { display: none; }
-  #todayBtn { margin-left: var(--sp-1); }
-  main { padding: var(--sp-4) var(--sp-3) 0 calc(var(--gutter-w) + var(--sp-1)); }
+  main { padding: var(--sp-8) var(--sp-3) 0 calc(var(--gutter-w) + var(--sp-1)); }
   .keys td:first-child { width: auto; white-space: normal; }
 }
 @media (max-width: 460px) {
-  .bar { flex-wrap: wrap; justify-content: flex-end; row-gap: var(--sp-1); }
-  .week { flex: 1 1 100%; }
-  #todayBtn { margin: 0 auto 0 0; }
+  .btn.date .weekday { display: none; }
+  .save-state:not(.bad) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
 /* Windows 對比主題：只靠底色的「選中」補系統色，只靠陰影的浮層補邊框 */
 @media (forced-colors: active) {
-  .day.current, .cal-grid button.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
-  .day.current b, .day.current span { color: HighlightText; }
-  .btn, .action, .week, .doc .filechip, .menu, .popover, .sheet, .toast, .settings .card { border: 1px solid ButtonText; }
+  .cal-grid button.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  .btn, .action, .doc .filechip, .menu, .popover, .sheet, .toast, .settings .card { border: 1px solid ButtonText; }
   .menu button:hover, .menu button:focus-visible, .menu.slash button.sel { background: Highlight; color: HighlightText; forced-color-adjust: none; }
-  .day.has::after, .cal-grid button.has::after { background: ButtonText; }
+  .cal-grid button.has::after { background: ButtonText; }
 }

@@ -231,6 +231,19 @@ function keepTrailingParagraph() {
   }
 }
 
+// 時間標記後面的東西被刪光了，那條線就不留（不然日期底下會掛一條孤單的時間）
+function dropOrphanMarks() {
+  const doc = editor.state.doc;
+  let tr = null; let pos = doc.content.size;
+  for (let i = doc.childCount - 1; i >= 0; i--) {
+    const n = doc.child(i); pos -= n.nodeSize;
+    if (n.type.name === 'paragraph' && !n.content.size) continue;
+    if (n.type.name !== 'timeMark') break;
+    tr = (tr || editor.state.tr).delete(pos, pos + n.nodeSize);
+  }
+  if (tr) editor.view.dispatch(tr.setMeta('addToHistory', false).setMeta('timeMark', true));
+}
+
 /* ---------- 抓手：整塊搬動 ---------- */
 const grip = { el: null, pos: null, dom: null };
 
@@ -412,13 +425,13 @@ function makeEditor(doc) {
   editor = new Editor({
     element: $('editor'),
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
+      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] }, dropcursor: { color: false, width: 3, class: 'drop-line' } }),
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true, HTMLAttributes: { rel: 'noopener', target: '_blank' } }),
       BlockImage.configure({ inline: false, allowBase64: true }),
       TaskList, TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
       FileChip, TimeMark,
-      Placeholder.configure({ placeholder: state.date === state.today ? '把剪下來的段落貼在這裡，或直接打字、拖檔案進來。打 / 叫出格式選單。' : `${fmtShort(state.date)} 這天沒有東西。直接打字或貼上就會記在這天。` }),
+      Placeholder.configure({ placeholder: state.date === state.today ? '把剪下來的段落貼在這裡，或直接打字、拖檔案進來。打 / 放圖片、檔案，或換格式。' : `${fmtShort(state.date)} 這天沒有東西。直接打字或貼上就會記在這天。` }),
       Markdown.configure({ html: false, linkify: true, breaks: true, transformPastedText: true, transformCopiedText: false }),
     ],
     content: doc || '',
@@ -471,8 +484,8 @@ function makeEditor(doc) {
         return false;
       },
     },
-    onCreate() { state.loading = true; keepTrailingParagraph(); state.loading = false; },
-    onUpdate({ transaction }) { if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); markDirty(); updateSlash(true); } },
+    onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; },
+    onUpdate({ transaction }) { if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); } },
     onSelectionUpdate() { updateSlash(false); },
   });
   makeGrip();
@@ -483,23 +496,9 @@ function makeEditor(doc) {
 function focusEditor() { if (editor) editor.commands.focus('end'); }
 
 /* ---------- 週條與標題 ---------- */
-function weekStart(k) { const d = fromKey(k); const off = (d.getDay() + 6) % 7; d.setDate(d.getDate() - off); return toKey(d); }
 
-function renderWeek() {
-  const wrap = $('week');
-  wrap.textContent = '';
-  const start = weekStart(state.date);
-  for (let i = 0; i < 7; i++) {
-    const k = addDays(start, i);
-    const d = fromKey(k);
-    const cls = ['day', k === state.date && 'current', k === state.today && 'today', state.counts[k] && 'has', (d.getDay() === 0 || d.getDay() === 6) && 'weekend'].filter(Boolean).join(' ');
-    wrap.append(el('button', {
-      class: cls, role: 'tab', 'aria-selected': k === state.date ? 'true' : 'false', tabindex: k === state.date ? '0' : '-1', 'data-key': k,
-      title: `${fmtDate(k)} ${WEEKDAYS[d.getDay()]}${state.counts[k] ? '（有東西）' : ''}`,
-      onclick: () => goTo(k),
-    }, el('span', { text: SHORT[d.getDay()] }), el('b', { text: String(d.getDate()) })));
-  }
-}
+// 頂列只剩一顆日期鈕；不在今天時才出現「回今天」
+function renderWeek() { $('todayBtn').hidden = state.date === state.today; }
 
 function renderHeading() {
   const d = fromKey(state.date);
@@ -531,8 +530,7 @@ async function load(find, stay) {
     editor.commands.focus('start');
     try { window.find(find, false, false, true); } catch { /* 找不到就停在頁首 */ }
   } else if (stay) {
-    const cur = $('week').querySelector('.day.current');
-    if (cur) cur.focus();
+    $('calBtn').focus();
   } else {
     focusEditor();
     if (state.date === state.today) page.scrollTop = page.scrollHeight;
@@ -544,12 +542,6 @@ async function goTo(k, find, stay) {
   state.date = k;
   await load(find, stay);
 }
-$('week').addEventListener('keydown', (e) => {
-  const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
-  if (!step || e.altKey || e.ctrlKey) return;
-  e.preventDefault(); e.stopPropagation();
-  goTo(addDays(state.date, step), null, true);
-});
 function goToday() { state.today = toKey(new Date()); return goTo(state.today); }
 
 async function pickFiles() {
@@ -588,6 +580,8 @@ window.addEventListener('drop', (e) => {
 
 /* ---------- 格式選單 ---------- */
 const FORMATS = [
+  ['圖片或檔案', 'Ctrl O', (c) => c, () => false, 'image img pic photo file tupian dangan fujian 圖 檔 照片 附件', () => pickFiles()],
+  null,
   ['內文', '', (c) => c.setParagraph(), (e) => e.isActive('paragraph') && !e.isActive('bulletList') && !e.isActive('orderedList') && !e.isActive('taskList') && !e.isActive('blockquote'), 'text p neiwen'],
   ['大標題', '#', (c) => c.toggleHeading({ level: 1 }), (e) => e.isActive('heading', { level: 1 }), 'h1 title biaoti'],
   ['中標題', '##', (c) => c.toggleHeading({ level: 2 }), (e) => e.isActive('heading', { level: 2 }), 'h2 biaoti'],
@@ -624,12 +618,13 @@ function openFormat() {
     if (!f) { menu.append(el('hr')); continue; }
     const [label, hint, run, active] = f;
     const on = editor && active(editor);
-    menu.append(el('button', { role: 'menuitemcheckbox', 'aria-checked': on ? 'true' : 'false', class: on ? 'on' : '', onclick: () => { closeFormat(); run(editor.chain().focus()).run(); } },
+    menu.append(el('button', { role: 'menuitemcheckbox', 'aria-checked': on ? 'true' : 'false', class: on ? 'on' : '', onclick: () => { closeFormat(); run(editor.chain().focus()).run(); if (f[5]) f[5](); } },
       el('span', { text: label }), hint ? el('kbd', { text: hint }) : null));
   }
   menu.append(el('hr'));
   menu.append(el('button', { role: 'menuitem', onclick: () => { closeFormat(); editor.commands.focus(); copyBlock(currentBlockPos()); } }, el('span', { text: '複製這一塊' }), el('kbd', { text: 'Ctrl Shift C' })));
   menu.append(el('button', { role: 'menuitem', onclick: () => { closeFormat(); openKeys(); } }, el('span', { text: '快捷鍵一覽' }), el('kbd', { text: 'Ctrl /' })));
+  menu.append(el('button', { role: 'menuitem', onclick: () => { closeFormat(); openSettings(); } }, el('span', { text: '設定' }), el('kbd', { text: 'Ctrl ,' })));
   menu.hidden = false;
   anchor(menu, $('formatBtn'));
   $('formatBtn').setAttribute('aria-expanded', 'true');
@@ -694,6 +689,7 @@ function applySlash(i) {
   const range = { from: slash.from, to: editor.state.selection.from };
   closeSlash();
   f[2](editor.chain().focus().deleteRange(range)).run();
+  if (f[5]) f[5]();
 }
 function slashKey(event) {
   if (!slash.open) return false;
@@ -870,7 +866,6 @@ async function patchSettings(patch) {
   if (!r.ok) toast(r.message);
   return r;
 }
-$('settingsBtn').addEventListener('click', openSettings);
 $('settingsClose').addEventListener('click', closeSettings);
 $('vaultOpen').addEventListener('click', () => dump.openVault());
 $('vaultChoose').addEventListener('click', async () => { const p = await dump.chooseVault(); if (p) showSettings(await dump.getSettings()); });
@@ -897,8 +892,8 @@ hotkeyInput.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 頂列與鍵盤 ---------- */
-$('prevWeek').addEventListener('click', () => goTo(addDays(state.date, -7)));
-$('nextWeek').addEventListener('click', () => goTo(addDays(state.date, 7)));
+$('prevDay').addEventListener('click', () => goTo(addDays(state.date, -1)));
+$('nextDay').addEventListener('click', () => goTo(addDays(state.date, 1)));
 $('todayBtn').addEventListener('click', () => goToday());
 
 document.addEventListener('keydown', (e) => {
