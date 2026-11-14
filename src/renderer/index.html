@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>蔥頭</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="bar">
+  <button class="icon" id="prevWeek" title="上一週（Alt+PageUp）" aria-label="上一週"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg></button>
+  <div class="week" id="week" role="tablist" aria-label="這一週"></div>
+  <button class="icon" id="nextWeek" title="下一週（Alt+PageDown）" aria-label="下一週"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4l6 6-6 6"/></svg></button>
+  <span class="spacer"></span>
+  <button class="pill" id="todayBtn" title="回到今天（Ctrl+T）">今天</button>
+  <button class="icon" id="formatBtn" title="格式：標題、清單、待辦…（在頁面裡打 / 也可以）" aria-label="格式" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16l4.5-12h1L13 16M4.6 12h6.8"/><path d="M14.5 8.5v7.5M12.5 10.5h4"/></svg></button>
+  <button class="icon" id="attachBtn" title="放檔案或圖片進這一頁（Ctrl+O）" aria-label="放檔案或圖片進這一頁"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M14.5 9.5l-5 5a3 3 0 01-4.2-4.2l6-6a2 2 0 012.8 2.8l-5.8 5.8a1 1 0 01-1.4-1.4l5-5"/></svg></button>
+  <button class="icon" id="calBtn" title="月曆（Ctrl+G）" aria-label="月曆" aria-haspopup="dialog"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12.5" rx="2"/><path d="M3 8.5h14M7 2.8v3M13 2.8v3"/></svg></button>
+  <button class="icon" id="searchBtn" title="搜尋（Ctrl+F）" aria-label="搜尋"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.2"/><path d="M13 13l4 4"/></svg></button>
+  <button class="icon" id="settingsBtn" title="設定（Ctrl+,）" aria-label="設定"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg></button>
+</header>
+
+<main id="page">
+  <div class="heading">
+    <h1 id="dateTitle"></h1>
+    <span class="weekday" id="weekday"></span>
+    <span class="badge" id="todayBadge" hidden>今天</span>
+    <span class="save-state" id="saveState" role="status" aria-live="polite"></span>
+  </div>
+  <div id="editor" class="doc"></div>
+</main>
+
+<div class="menu" id="formatMenu" role="menu" aria-label="格式" hidden></div>
+<div class="menu slash" id="slashMenu" role="listbox" aria-label="格式（打字篩選，Enter 套用）" hidden></div>
+
+<div class="drop" id="drop" hidden><div>放開，丟進 <span id="dropDate"></span></div></div>
+
+<div class="popover" id="calendar" role="dialog" aria-label="月曆" hidden>
+  <div class="cal-head">
+    <button class="icon" id="calPrev" aria-label="上個月"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <div id="calTitle"></div>
+    <button class="icon" id="calNext" aria-label="下個月"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4l6 6-6 6"/></svg></button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+
+<div class="overlay" id="searchPanel" role="dialog" aria-label="搜尋" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <input id="searchInput" type="text" placeholder="搜尋所有日子…" aria-label="搜尋">
+      <button class="icon" id="searchClose" aria-label="關閉搜尋" title="關閉（Esc）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+    </div>
+    <div class="sheet-body" id="searchResults"></div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsPanel" role="dialog" aria-label="設定" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>設定</h2>
+      <button class="icon" id="settingsClose" aria-label="關閉設定" title="關閉（Esc）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+    </div>
+    <div class="sheet-body settings">
+      <section>
+        <h3>垃圾庫位置</h3>
+        <p class="path" id="vaultPath"></p>
+        <div class="row">
+          <button class="pill" id="vaultOpen">打開資料夾</button>
+          <button class="pill" id="vaultChoose">換位置…</button>
+        </div>
+        <p class="hint">每天一個資料夾，裡面是 index.md（可直接讀的 Markdown）、page.json 和 files。換位置不會搬舊資料，要搬請自己把整個資料夾移過去。</p>
+      </section>
+      <section>
+        <h3>全域快捷鍵</h3>
+        <div class="row">
+          <input id="hotkeyInput" readonly aria-label="全域快捷鍵，點一下後按新的組合鍵">
+          <button class="pill" id="hotkeyClear">不用快捷鍵</button>
+        </div>
+        <p class="hint" id="hotkeyHint">點一下輸入框，再按你要的組合鍵。在任何程式裡按它，就會叫出或收起這個視窗。</p>
+      </section>
+      <section>
+        <label class="check"><input type="checkbox" id="closeToTray"> 關閉視窗時留在系統匣（快捷鍵才叫得出來）</label>
+        <label class="check"><input type="checkbox" id="launchAtLogin"> 開機時自動啟動（安靜待在系統匣）</label>
+        <p class="hint" id="loginHint" hidden>開機啟動要用打包好的版本才會生效。</p>
+      </section>
+      <section>
+        <h3>打字時的快速格式與快捷鍵</h3>
+        <table class="keys">
+          <tr><td>/</td><td>叫出格式選單，繼續打字可以篩選，Enter 套用</td></tr>
+          <tr><td># 空格</td><td>大標題（## 中標、### 小標）</td></tr>
+          <tr><td>- 空格</td><td>項目符號</td></tr>
+          <tr><td>1. 空格</td><td>編號清單</td></tr>
+          <tr><td>[ ] 空格</td><td>待辦勾選</td></tr>
+          <tr><td>&gt; 空格</td><td>引言</td></tr>
+          <tr><td>--- </td><td>分隔線</td></tr>
+          <tr><td>Ctrl+B / Ctrl+I</td><td>粗體 / 斜體</td></tr>
+          <tr><td>Tab / Shift+Tab</td><td>清單縮排 / 退回</td></tr>
+          <tr><td>Alt+↑ / Alt+↓</td><td>把這一塊（或清單裡這一項）往上 / 往下搬</td></tr>
+          <tr><td>左邊的抓手</td><td>滑鼠移到某一塊才出現：拖曳搬動，點一下選取整塊；旁邊那顆是複製整塊</td></tr>
+          <tr><td>Ctrl+V</td><td>貼上文字、網址、截圖、檔案（格式會保留）</td></tr>
+          <tr><td>Ctrl+Shift+V</td><td>貼成純文字</td></tr>
+          <tr><td>Ctrl+O</td><td>選檔案</td></tr>
+          <tr><td>Alt+T</td><td>插入現在時間</td></tr>
+          <tr><td>Alt+← / Alt+→</td><td>前一天 / 後一天</td></tr>
+          <tr><td>Ctrl+T</td><td>回到今天</td></tr>
+          <tr><td>Ctrl+G</td><td>月曆</td></tr>
+          <tr><td>Ctrl+F</td><td>搜尋</td></tr>
+          <tr><td>Ctrl+Z</td><td>復原</td></tr>
+          <tr><td>Esc</td><td>關掉面板；沒有面板時收起視窗</td></tr>
+        </table>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span id="toastText"></span>
+  <button class="link" id="toastAction" hidden></button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
