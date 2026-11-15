@@ -140,6 +140,14 @@ class Store {
     return out;
   }
 
+  // 側邊欄用：since（含）之後有內容的日子，新的在前，連同那天的文件一起給。
+  recent(since) {
+    return [...this.cache.keys()].filter((d) => d >= since).sort().reverse().map((date) => {
+      const page = this._read(date);
+      return { date, doc: page ? page.doc : null };
+    });
+  }
+
   // 每個字都要出現在那一天；回傳那天裡命中的幾行。
   search(query, limit = 200) {
     const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);

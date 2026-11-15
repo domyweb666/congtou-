@@ -169,6 +169,7 @@ function registerIpc() {
   });
   ipcMain.handle('page:save', (_e, date, page) => store.savePage(date, page));
   ipcMain.handle('days:counts', () => store.counts());
+  ipcMain.handle('days:recent', (_e, since) => store.recent(String(since)));
   ipcMain.handle('add:paths', async (_e, date, paths) => {
     const assets = []; const skipped = [];
     for (const p of paths) {

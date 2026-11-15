@@ -44,6 +44,7 @@
     },
     savePage: async (date, page) => { const v = { doc: page.doc, text: page.text, empty: page.empty }; pages.set(date, v); put('pages', date, v); },
     counts: async () => { await ready; const o = {}; for (const [d, p] of pages) if (!p.empty) o[d] = 1; return o; },
+    recent: async (since) => { await ready; return [...pages.keys()].filter((d) => d >= since && !pages.get(d).empty).sort().reverse().map((date) => ({ date, doc: pages.get(date).doc })); },
     addPaths: async () => ({ assets: [], skipped: [] }),
     addBuffer: async (date, name, data) => {
       let file = name.replace(/[<>:"/\\|?*()[\]]/g, '_'); let n = 2;

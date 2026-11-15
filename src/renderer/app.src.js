@@ -510,7 +510,7 @@ function makeEditor(doc) {
       },
     },
     onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; },
-    onUpdate({ transaction }) { if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); } },
+    onUpdate({ transaction }) { if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
     onSelectionUpdate() { updateSlash(false); },
   });
   makeGrip();
@@ -519,6 +519,119 @@ function makeEditor(doc) {
   $('editor').addEventListener('click', (e) => { if (e.target.closest('a[href]')) e.preventDefault(); });
 }
 function focusEditor() { if (editor) editor.commands.focus('end'); }
+
+/* ---------- 側邊欄 ---------- */
+// 最近幾天的清單。每一天的摘要從文件算出來：開頭一行、幾段、幾個檔案、時間標記。
+const RECENT_DAYS = 14;
+const days = new Map(); // date -> 摘要
+const narrowQuery = window.matchMedia('(max-width: 760px)');
+const side = { pref: true, narrowOpen: false };
+try { side.pref = localStorage.getItem('side') !== '0'; } catch { /* 記不住就每次都打開 */ }
+
+function nodeText(n) {
+  if (!n) return '';
+  if (n.type === 'text') return n.text || '';
+  if (n.type === 'hardBreak') return ' ';
+  if (n.type === 'fileChip') return (n.attrs && n.attrs.name) || '';
+  if (n.type === 'image') return (n.attrs && n.attrs.alt) || '';
+  const kids = n.content || [];
+  return kids.map(nodeText).join(kids.some((k) => k.type === 'text') ? '' : ' ');
+}
+function summarize(doc) {
+  const out = { preview: '', blocks: 0, files: 0, marks: [] };
+  let mark = null;
+  ((doc && doc.content) || []).forEach((n, index) => {
+    if (n.type === 'timeMark') { mark = { time: (n.attrs && n.attrs.time) || '', index, text: '' }; out.marks.push(mark); return; }
+    if (n.type === 'horizontalRule') return;
+    const isFile = n.type === 'image' || n.type === 'fileChip';
+    const text = nodeText(n).replace(/[\s\u200b\ufeff]+/g, ' ').trim();
+    if (!isFile && !text) return;
+    if (isFile) out.files++; else out.blocks++;
+    if (!out.preview && text) out.preview = text.slice(0, 90);
+    if (mark && !mark.text && text) mark.text = text.slice(0, 40);
+  });
+  return out;
+}
+const sideVisible = () => (narrowQuery.matches ? side.narrowOpen : side.pref);
+function applySide() {
+  const on = sideVisible();
+  document.body.classList.toggle('side-off', !on);
+  $('sideShow').hidden = on;
+}
+function setSide(on) {
+  if (narrowQuery.matches) side.narrowOpen = on;
+  else { side.pref = on; try { localStorage.setItem('side', on ? '1' : '0'); } catch { /* 沒差 */ } }
+  applySide();
+  if (on) renderSide();
+}
+narrowQuery.addEventListener('change', () => { side.narrowOpen = false; applySide(); });
+// 窄視窗的側邊欄是蓋在內容上面的，挑完日子或點旁邊就收起來
+function closeNarrowSide() { if (narrowQuery.matches && side.narrowOpen) setSide(false); }
+document.addEventListener('mousedown', (e) => { if (narrowQuery.matches && side.narrowOpen && !$('side').contains(e.target) && !$('sideShow').contains(e.target) && !$('calendar').contains(e.target)) setSide(false); });
+$('sideHide').addEventListener('click', () => { setSide(false); focusEditor(); });
+$('sideShow').addEventListener('click', () => setSide(true));
+$('settingsBtn').addEventListener('click', () => openSettings());
+
+function dayLabel(k) {
+  const d = fromKey(k);
+  const thisYear = d.getFullYear() === fromKey(state.today).getFullYear();
+  return `${thisYear ? fmtShort(k) : fmtDate(k)} ${WEEKDAYS[d.getDay()]}`;
+}
+function dayItem(k) {
+  const s = days.get(k);
+  const count = s ? [s.blocks && `${s.blocks} 段`, s.files && `${s.files} 檔案`].filter(Boolean).join('・') : '';
+  const preview = s ? (s.preview || '圖片或檔案') : '還沒丟東西';
+  return el('button', { class: `day${k === state.date ? ' current' : ''}${s ? '' : ' blank'}`, 'aria-current': k === state.date ? 'true' : null, onclick: () => { closeNarrowSide(); if (k !== state.date) goTo(k); else focusEditor(); } },
+    el('span', { class: 'day-head' }, el('b', { text: dayLabel(k) }), count ? el('span', { class: 'day-count', text: count }) : null),
+    el('span', { class: 'day-preview', text: preview }));
+}
+async function jumpToMark(index) {
+  closeNarrowSide();
+  if (state.date !== state.today) await goTo(state.today);
+  const doc = editor.state.doc;
+  if (index >= doc.childCount) return;
+  let pos = 0;
+  for (let i = 0; i < index; i++) pos += doc.child(i).nodeSize;
+  const dom = editor.view.nodeDOM(pos);
+  if (dom && dom.scrollIntoView) dom.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+function renderSide() {
+  if (!sideVisible()) return;
+  // 正在看的這一天以畫面上的內容為準（可能還沒存檔）
+  if (editor && !state.loading) {
+    const live = summarize(editor.getJSON());
+    if (live.blocks + live.files) days.set(state.date, live); else days.delete(state.date);
+  }
+  const box = $('sideList');
+  const keepOlder = !!box.querySelector('#olderBtn[aria-expanded="true"]');
+  box.textContent = '';
+  const since = addDays(state.today, -(RECENT_DAYS - 1));
+  box.append(el('div', { class: 'side-label', text: '今天' }), dayItem(state.today));
+  const marks = (days.get(state.today) || { marks: [] }).marks.filter((m) => m.text);
+  if (marks.length) {
+    const list = el('div', { class: 'marks' });
+    for (const m of marks) list.append(el('button', { class: 'mark', title: `跳到 ${m.time} 丟的那一段`, onclick: () => jumpToMark(m.index) }, el('span', { class: 'mark-time', text: m.time }), el('span', { class: 'mark-text', text: m.text })));
+    box.append(list);
+  }
+  const recent = [...days.keys()].filter((k) => k !== state.today && k >= since).sort().reverse();
+  if (recent.length) {
+    box.append(el('div', { class: 'side-label', text: '最近幾天' }));
+    for (const k of recent) box.append(dayItem(k));
+  }
+  box.append(el('div', { class: 'side-label', text: '更早' }));
+  if (state.date < since) box.append(dayItem(state.date));
+  box.append(el('button', { class: 'older', id: 'olderBtn', 'aria-haspopup': 'dialog', 'aria-expanded': keepOlder ? 'true' : 'false', title: '用月曆挑更早的日子（Ctrl+G）', onclick: (e) => ($('calendar').hidden ? openCalendar(e.currentTarget) : closeCalendar()) },
+    el('span', { text: '用月曆挑日子' }), el('span', { class: 'older-chev', text: '›', 'aria-hidden': 'true' })));
+}
+let sideTimer = null;
+function touchSide() { clearTimeout(sideTimer); sideTimer = setTimeout(renderSide, 300); }
+async function refreshDays() {
+  const list = await dump.recent(addDays(state.today, -(RECENT_DAYS - 1)));
+  days.clear();
+  for (const r of list) days.set(r.date, summarize(r.doc));
+  renderSide();
+}
+applySide();
 
 /* ---------- 週條與標題 ---------- */
 
@@ -549,11 +662,12 @@ async function load(find, stay) {
   setSaveState('');
   renderHeading();
   renderWeek();
+  renderSide();
   page.scrollTop = 0;
   if (find) {
     window.getSelection().removeAllRanges();
     editor.commands.focus('start');
-    try { window.find(find, false, false, true); } catch { /* 找不到就停在頁首 */ }
+    try { window.find(find, false, false, false); } catch { /* 找不到就停在頁首 */ }
   } else if (stay) {
     $('calBtn').focus();
   } else {
@@ -578,7 +692,7 @@ async function pickFiles() {
 }
 $('attachBtn').addEventListener('click', pickFiles);
 
-const overlayOpen = () => !$('searchPanel').hidden || !$('settingsPanel').hidden || !$('keysPanel').hidden;
+const overlayOpen = () => !$('settingsPanel').hidden || !$('keysPanel').hidden;
 
 // 點頁面下方的空白處，游標就到最後
 page.addEventListener('mousedown', (e) => { if (e.target === page) { e.preventDefault(); focusEditor(); } });
@@ -634,6 +748,14 @@ function anchor(box, btn) {
   box.style.right = `${Math.max(8, right)}px`;
   box.style.maxHeight = `${window.innerHeight - top - 8}px`;
   box.style.overflowY = 'auto';
+}
+// 從側邊欄叫出來的月曆：靠左貼在那顆按鈕旁邊，放不下就往上推
+function anchorLeft(box, btn) {
+  const r = btn.getBoundingClientRect();
+  box.style.right = 'auto';
+  box.style.left = `${Math.max(8, Math.min(Math.round(r.left), window.innerWidth - box.offsetWidth - 8))}px`;
+  box.style.top = `${Math.max(8, Math.min(Math.round(r.bottom + 6), window.innerHeight - box.offsetHeight - 8))}px`;
+  box.style.maxHeight = ''; box.style.overflowY = '';
 }
 function openFormat() {
   closeCalendar();
@@ -767,16 +889,21 @@ $('calGrid').addEventListener('keydown', (e) => {
   e.preventDefault(); e.stopPropagation();
   focusCalDay(next);
 });
-function openCalendar() {
+function openCalendar(from) {
   closeFormat();
+  const btn = from && from.isConnected ? from : $('calBtn');
   const d = fromKey(state.date);
   state.calMonth = [d.getFullYear(), d.getMonth()];
   $('calendar').hidden = false;
-  anchor($('calendar'), $('calBtn'));
-  $('calBtn').setAttribute('aria-expanded', 'true');
+  renderCalendar();
+  if (btn === $('calBtn')) { $('calendar').style.left = 'auto'; anchor($('calendar'), btn); } else anchorLeft($('calendar'), btn);
+  btn.setAttribute('aria-expanded', 'true');
   focusCalDay(state.date);
 }
-function closeCalendar() { $('calendar').hidden = true; $('calBtn').setAttribute('aria-expanded', 'false'); }
+function closeCalendar() {
+  $('calendar').hidden = true; $('calBtn').setAttribute('aria-expanded', 'false');
+  const older = $('olderBtn'); if (older) older.setAttribute('aria-expanded', 'false');
+}
 function shiftMonth(n) {
   const d = new Date(state.calMonth[0], state.calMonth[1] + n, 1);
   state.calMonth = [d.getFullYear(), d.getMonth()];
@@ -785,11 +912,11 @@ function shiftMonth(n) {
   if (f.getFullYear() !== d.getFullYear() || f.getMonth() !== d.getMonth()) state.calFocus = toKey(d);
   renderCalendar();
 }
-$('calBtn').addEventListener('click', () => ($('calendar').hidden ? openCalendar() : closeCalendar()));
+$('calBtn').addEventListener('click', () => ($('calendar').hidden ? openCalendar($('calBtn')) : closeCalendar()));
 $('calPrev').addEventListener('click', () => shiftMonth(-1));
 $('calNext').addEventListener('click', () => shiftMonth(1));
 document.addEventListener('mousedown', (e) => {
-  if (!$('calendar').hidden && !$('calendar').contains(e.target) && !$('calBtn').contains(e.target)) closeCalendar();
+  if (!$('calendar').hidden && !$('calendar').contains(e.target) && !$('calBtn').contains(e.target) && !e.target.closest('#olderBtn')) closeCalendar();
 });
 
 /* ---------- 搜尋 ---------- */
@@ -816,7 +943,9 @@ async function runSearch() {
   const q = $('searchInput').value.trim();
   const box = $('searchResults');
   box.textContent = '';
-  if (!q) { box.append(el('div', { class: 'note', text: '輸入幾個字，會找遍所有日子。多個字用空格分開。' })); return; }
+  // 沒打字就是平常的日子清單；有打字，側邊欄換成搜尋結果
+  $('sideList').hidden = !!q; box.hidden = !q; $('searchEsc').hidden = !q;
+  if (!q) return;
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   await flush();
   const results = await dump.search(q);
@@ -827,20 +956,18 @@ async function runSearch() {
     const lines = el('span', { class: 'lines' });
     for (const line of r.lines) lines.append(el('span', { class: 'snippet' }, highlight(line, words)));
     if (r.more) lines.append(el('span', { class: 'kind', text: `還有 ${r.more} 行` }));
-    box.append(el('button', { class: 'result', onclick: () => { $('searchPanel').hidden = true; goTo(r.date, words[0]); } },
+    box.append(el('button', { class: 'result', onclick: () => { closeNarrowSide(); goTo(r.date, words[0]); } },
       el('span', { class: 'result-date', text: `${fmtDate(r.date)} ${WEEKDAYS[fromKey(r.date).getDay()]}` }), lines));
   }
 }
+const searching = () => document.activeElement === $('searchInput') || !!$('searchInput').value;
 function openSearch() {
   closeCalendar(); closeFormat();
   $('settingsPanel').hidden = true; $('keysPanel').hidden = true;
-  $('searchPanel').hidden = false;
+  if (!sideVisible()) setSide(true);
   $('searchInput').focus(); $('searchInput').select();
-  runSearch();
 }
-function closeSearch() { $('searchPanel').hidden = true; focusEditor(); }
-$('searchBtn').addEventListener('click', openSearch);
-$('searchClose').addEventListener('click', closeSearch);
+function closeSearch() { $('searchInput').value = ''; runSearch(); focusEditor(); }
 $('searchInput').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 150); });
 $('searchInput').addEventListener('keydown', (e) => {
   if (e.isComposing || e.keyCode === 229) return;
@@ -855,7 +982,7 @@ $('searchResults').addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' && i === 0) $('searchInput').focus();
   else (items[i + (e.key === 'ArrowDown' ? 1 : -1)] || items[i]).focus();
 });
-for (const id of ['searchPanel', 'settingsPanel', 'keysPanel']) {
+for (const id of ['settingsPanel', 'keysPanel']) {
   $(id).addEventListener('mousedown', (e) => { if (e.target === $(id)) { $(id).hidden = true; focusEditor(); } });
 }
 
@@ -870,7 +997,7 @@ function showSettings(s) {
 }
 async function openSettings() {
   closeCalendar(); closeFormat();
-  $('searchPanel').hidden = true; $('keysPanel').hidden = true;
+  $('keysPanel').hidden = true;
   showSettings(await dump.getSettings());
   $('settingsPanel').hidden = false;
   $('settingsClose').focus();
@@ -878,7 +1005,7 @@ async function openSettings() {
 function closeSettings() { $('settingsPanel').hidden = true; focusEditor(); }
 function openKeys() {
   closeCalendar(); closeFormat();
-  $('searchPanel').hidden = true; $('settingsPanel').hidden = true;
+  $('settingsPanel').hidden = true;
   $('keysPanel').hidden = false;
   $('keysClose').focus();
 }
@@ -928,18 +1055,20 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!$('formatMenu').hidden) { closeFormat(); focusEditor(); }
     else if (!$('calendar').hidden) { closeCalendar(); focusEditor(); }
-    else if (!$('searchPanel').hidden) closeSearch();
     else if (!$('settingsPanel').hidden) closeSettings();
     else if (!$('keysPanel').hidden) closeKeys();
+    else if (searching()) closeSearch();
+    else if (narrowQuery.matches && side.narrowOpen) { setSide(false); focusEditor(); }
     else flush().then(() => dump.hide());
     return;
   }
   if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); openSearch(); return; }
   if (ctrl && e.key === ',') { e.preventDefault(); openSettings(); return; }
+  if (ctrl && e.key === '\\') { e.preventDefault(); const on = !sideVisible(); setSide(on); if (!on) focusEditor(); return; }
   if (ctrl && e.key === '/') { e.preventDefault(); if ($('keysPanel').hidden) openKeys(); else closeKeys(); return; }
   if (overlayOpen()) return;
   if (ctrl && e.key.toLowerCase() === 't') { e.preventDefault(); goToday(); }
-  else if (ctrl && e.key.toLowerCase() === 'g') { e.preventDefault(); $('calendar').hidden ? openCalendar() : closeCalendar(); }
+  else if (ctrl && e.key.toLowerCase() === 'g') { e.preventDefault(); $('calendar').hidden ? openCalendar($('calBtn')) : closeCalendar(); }
   else if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); pickFiles(); }
   else if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); flush().then(() => toast('已存好（平常會自動存）', 1500)); }
   else if (alt && e.key === 'ArrowLeft') { e.preventDefault(); goTo(addDays(state.date, -1)); }
@@ -949,20 +1078,21 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 主程序來的訊息 ---------- */
-dump.on('go-today', () => { $('searchPanel').hidden = true; $('settingsPanel').hidden = true; $('keysPanel').hidden = true; closeCalendar(); goToday(); });
+dump.on('go-today', () => { $('settingsPanel').hidden = true; $('keysPanel').hidden = true; closeCalendar(); goToday(); });
 dump.on('open-settings', openSettings);
-dump.on('vault:changed', async () => { state.dirty = false; await refreshCounts(); await load(); });
+dump.on('vault:changed', async () => { state.dirty = false; await refreshCounts(); await load(); await refreshDays(); });
 dump.on('flush', () => { flush().then(() => { if (dump.flushed) dump.flushed(); }); });
 window.addEventListener('blur', () => { flush(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 window.addEventListener('focus', () => {
   const now = toKey(new Date());
-  if (now !== state.today) { const wasToday = state.date === state.today; state.today = now; if (wasToday) goTo(now); else { renderWeek(); renderHeading(); } }
+  if (now !== state.today) { const wasToday = state.date === state.today; state.today = now; if (wasToday) goTo(now); else { renderWeek(); renderHeading(); } refreshDays(); }
 });
 
 /* ---------- 開始 ---------- */
-Object.assign(window, { state, goTo, flush, openSearch, openSettings, closeSettings, openCalendar, closeCalendar, runSearch, getEditor: () => editor, placeGrip, grip, openFormat, closeFormat, slash, copyBlock, lastEditAt, openKeys, closeKeys });
+Object.assign(window, { state, goTo, flush, openSearch, openSettings, closeSettings, openCalendar, closeCalendar, runSearch, getEditor: () => editor, placeGrip, grip, openFormat, closeFormat, slash, copyBlock, lastEditAt, openKeys, closeKeys, renderSide, refreshDays, setSide, summarize });
 (async function start() {
   state.counts = await dump.counts();
   await load();
+  await refreshDays();
 })();

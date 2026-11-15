@@ -26,6 +26,7 @@ const { Store } = require('../src/store');
   assert.deepEqual(s.counts(), { [d]: 1 });
   assert.equal(s.search('夜班')[0].date, d); assert.deepEqual(s.search('夜班')[0].lines, ['夜班加工 整理突觸']);
   assert.equal(s.search('睡眠 突觸').length, 1); assert.equal(s.search('沒有這個').length, 0);
+  assert.deepEqual(s.recent('2026-11-01'), [{ date: d, doc }]); assert.deepEqual(s.recent('2026-11-15'), []);
 
   const s2 = new Store(dir); // 重開之後資料要還在
   assert.deepEqual(s2.getPage(d).doc, doc); assert.equal(s2.getPage(d).files.length, 3);

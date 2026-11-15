@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('dump', {
   getPage: call('page:get'),
   savePage: call('page:save'),
   counts: call('days:counts'),
+  recent: call('days:recent'),
   addPaths: call('add:paths'),
   addBuffer: call('add:buffer'),
   openFile: call('file:open'),

@@ -16,13 +16,14 @@
   --gutter-w: 54px;
   --doc-top: 40px;
   --num-w: 36px;
+  --side-w: 248px;
 }
 :root[data-theme='dark'] { --scrim: rgba(0, 0, 0, 0.5); }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
-  margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  margin: 0; display: flex; overflow: hidden;
   background: var(--ap-surface); color: var(--ap-text);
   font-family: var(--ap-font); font-size: var(--fs-body); line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -85,6 +86,39 @@ kbd {
   content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px;
   border-radius: 50%; background: var(--ap-accent);
 }
+
+/* ---------- 側邊欄：搜尋、今天、最近幾天、更早 ---------- */
+.right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.side { width: var(--side-w); flex: none; display: flex; flex-direction: column; background: var(--ap-bg); border-right: 1px solid var(--ap-sep-soft); user-select: none; }
+body.side-off .side { display: none; }
+.side-top { flex: none; height: var(--bar-h); display: flex; align-items: center; padding: 0 var(--sp-2_5); }
+.side-top .search-field { margin-left: 0; height: var(--ctl-h); border-radius: var(--r-md); }
+.side-scroll { flex: 1; overflow-y: auto; padding: 0 var(--sp-2) var(--sp-2); }
+.side-label { padding: var(--sp-3) var(--sp-2) var(--sp-1); color: var(--ap-text-2); font-size: var(--fs-caption); font-weight: 600; letter-spacing: 0.02em; }
+.side-label:first-child { padding-top: var(--sp-1); }
+.day { display: block; width: 100%; padding: var(--sp-2); border: 0; border-radius: var(--r-md); background: transparent; text-align: left; transition: background var(--dur-fast) ease; }
+.day:hover { background: var(--ap-fill); }
+.day.current { background: var(--ap-accent-bg); }
+.day-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.day-head b { font-weight: 600; color: var(--ap-text); white-space: nowrap; }
+.day.current .day-head b { color: var(--ap-accent-deep); }
+.day-count { color: var(--ap-text-2); font-size: var(--fs-caption); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.day-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: var(--sp-0_5); color: var(--ap-text-2); font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere; }
+.day.blank .day-preview { color: var(--ap-text-3); }
+.marks { padding: var(--sp-0_5) 0 var(--sp-1) var(--sp-3); }
+.mark { display: flex; width: 100%; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border: 0; border-radius: var(--r-sm); background: transparent; text-align: left; font-size: var(--fs-small); color: var(--ap-text-2); }
+.mark:hover { background: var(--ap-fill); color: var(--ap-text); }
+.mark-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ap-text-3); }
+.mark-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.older { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: var(--sp-1_5) var(--sp-2); border: 0; border-radius: var(--r-md); background: transparent; color: var(--ap-text-body); text-align: left; }
+.older:hover { background: var(--ap-fill); }
+.older[aria-expanded="true"] { background: var(--ap-accent-bg); color: var(--ap-accent-text); }
+.older-chev { color: var(--ap-text-3); }
+.side-foot { flex: none; display: flex; align-items: center; padding: var(--sp-1_5) var(--sp-2); border-top: 1px solid var(--ap-sep-soft); }
+.side-foot .btn { font-weight: 400; color: var(--ap-text-2); }
+.side .result { padding: var(--sp-2); }
+.side .result .snippet { font-size: var(--fs-small); }
+.side .note { padding: var(--sp-3) var(--sp-2); font-size: var(--fs-small); }
 
 /* ---------- 這一天 ---------- */
 main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + var(--sp-4)) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
@@ -276,7 +310,11 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
   background: var(--ap-fill-hover); color: var(--ap-text-on-color); font-weight: 600;
 }
 
-/* ---------- 視窗變窄：頂列只有一排，先收星期，再收「已儲存」 ---------- */
+/* ---------- 視窗變窄：側邊欄先收起來，叫出來時蓋在內容上面 ---------- */
+@media (max-width: 760px) {
+  .side { position: fixed; z-index: 15; top: 0; bottom: 0; left: 0; box-shadow: var(--ap-shadow-float); }
+}
+/* ---------- 再窄：頂列只有一排，先收星期，再收「已儲存」 ---------- */
 @media (max-width: 620px) {
   main { padding: var(--sp-8) var(--sp-3) 0 calc(var(--gutter-w) + var(--sp-1)); }
   .keys td:first-child { width: auto; white-space: normal; }
@@ -294,6 +332,8 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 @media (forced-colors: active) {
   .cal-grid button.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
   .btn, .action, .doc .filechip, .menu, .popover, .sheet, .toast, .settings .card { border: 1px solid ButtonText; }
+  .day.current, .older[aria-expanded="true"] { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  .side { border-right: 1px solid ButtonText; }
   .menu button:hover, .menu button:focus-visible, .menu.slash button.sel { background: Highlight; color: HighlightText; forced-color-adjust: none; }
   .cal-grid button.has::after { background: ButtonText; }
 }
