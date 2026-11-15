@@ -3,8 +3,10 @@
    不在階梯上的值只有三種：1px 以下的細線、36px 以上的版面尺寸、行內標「例外」的那幾行。 */
 :root {
   /* 例外:使用者寫的內容不走介面五階，這一頁自己定（設計系統 README「字」第三條） */
-  --doc-fs: 15px;
-  --doc-lh: 1.7;
+  --doc-fs: 17px;
+  --doc-lh: 1.75;
+  /* 例外:內文的中文用思源黑體（Windows 11 內建 Noto Sans TC），沒有才退回微軟正黑；Mac 維持蘋方 */
+  --doc-font: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Segoe UI Variable Text', 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
   /* 例外:蓋在整個視窗上的遮罩，設計系統沒有這個代號 */
   --scrim: rgba(0, 0, 0, 0.28);
   /* 版面尺寸 */
@@ -88,7 +90,7 @@ kbd {
 main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + var(--sp-4)) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
 
 /* 這一天的文件 */
-.doc { max-width: var(--doc-w); margin: 0 auto; position: relative; font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
+.doc { max-width: var(--doc-w); margin: 0 auto; position: relative; font-family: var(--doc-font); font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
 .gutter { position: absolute; left: calc(var(--gutter-w) * -1); display: flex; gap: var(--sp-0_5); }
 .gutter-btn {
   width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ap-text-3);
