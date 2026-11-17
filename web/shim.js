@@ -32,6 +32,8 @@
 
   const urlFor = (key) => { if (!urls.has(key) && blobs.has(key)) urls.set(key, URL.createObjectURL(blobs.get(key))); return urls.get(key) || ''; };
   const follow = (href) => { const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.body.append(a); a.click(); a.remove(); };
+  const trashRead = () => { try { return JSON.parse(localStorage.getItem('dump-trash') || '[]'); } catch { return []; } };
+  const trashWrite = (list) => { try { localStorage.setItem('dump-trash', JSON.stringify(list)); } catch { /* 存不了就算了 */ } };
   const settings = { vaultPath: '這個瀏覽器裡（網頁預覽版，只供試用，資料不保證留得住）', hotkey: 'Ctrl+Alt+D', closeToTray: true, launchAtLogin: false, packaged: true };
 
   window.dump = {
@@ -73,12 +75,22 @@
       }
       return out;
     },
+    // 最近刪除：網頁版放在瀏覽器的 localStorage
+    addTrash: async (entries) => {
+      const now = Date.now();
+      const list = trashRead();
+      entries.forEach((e, i) => list.unshift({ id: `${now}-${i}`, at: now, date: e.date, node: e.node, text: e.text }));
+      trashWrite(list.slice(0, 300));
+    },
+    listTrash: async () => trashRead().filter((e) => e.at >= Date.now() - 30 * 864e5).sort((a, b) => b.at - a.at),
+    takeTrash: async (id) => { const list = trashRead(); const hit = list.find((e) => e.id === id) || null; trashWrite(list.filter((e) => e.id !== id)); return hit; },
     getSettings: async () => ({ ...settings }),
     setSettings: async (patch) => { Object.assign(settings, patch); return { ok: true, message: '', settings: { ...settings } }; },
     chooseVault: async () => { toast('網頁預覽版不能換位置；Windows 版可以。'); return null; },
     openVault: async () => { toast('網頁預覽版沒有資料夾；Windows 版會打開垃圾庫。'); },
     pickFiles: async () => { document.getElementById('webFile').click(); return []; },
     hide: async () => {},
+    pin: async (on) => { if (on) toast('網頁預覽版不能釘在最上層；Windows 版會縮成一條浮在稿子旁邊。'); return false; },
     pathFor: () => '',
     on: () => {},
   };

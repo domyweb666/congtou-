@@ -148,6 +148,34 @@ class Store {
     });
   }
 
+  // 最近刪除：被整塊刪掉的東西先收在垃圾庫的 .trash.json，30 天或 300 塊以後才真的丟掉。
+  // 附件不會被刪（files/ 裡的檔案一直都在），所以圖片、檔案放回去也打得開。
+  _trashFile() { return path.join(this.vault, '.trash.json'); }
+  _readTrash() {
+    try { const list = JSON.parse(fs.readFileSync(this._trashFile(), 'utf8')); return Array.isArray(list) ? list : []; } catch { return []; }
+  }
+  async _writeTrash(list) {
+    const tmp = this._trashFile() + '.tmp';
+    await fsp.writeFile(tmp, JSON.stringify(list), 'utf8');
+    await fsp.rename(tmp, this._trashFile());
+  }
+  listTrash() {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return this._readTrash().filter((e) => e.at >= cutoff).sort((a, b) => b.at - a.at);
+  }
+  async addTrash(entries) {
+    const now = Date.now();
+    const add = (entries || []).filter((e) => e && DATE_RE.test(e.date) && e.node).map((e, i) => ({ id: `${now}-${i}-${Math.random().toString(36).slice(2, 7)}`, at: now, date: e.date, node: e.node, text: String(e.text || '').slice(0, 300) }));
+    if (!add.length) return;
+    await this._writeTrash([...add, ...this.listTrash()].slice(0, 300));
+  }
+  async takeTrash(id) {
+    const list = this.listTrash();
+    const hit = list.find((e) => e.id === id);
+    if (hit) await this._writeTrash(list.filter((e) => e.id !== id));
+    return hit || null;
+  }
+
   // 每個字都要出現在那一天；回傳那天裡命中的幾行。
   search(query, limit = 200) {
     const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);

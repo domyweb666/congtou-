@@ -13,6 +13,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import { Markdown } from 'tiptap-markdown';
 import { NodeSelection, TextSelection, Plugin } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { DOMSerializer } from '@tiptap/pm/model';
 
 const $ = (id) => document.getElementById(id);
 // 深色跟著系統走：設計系統的深色代號掛在 <html data-theme="dark">
@@ -88,10 +89,14 @@ function fmtDate(k) { const d = fromKey(k); return `${d.getFullYear()}年${d.get
 function fmtShort(k) { const d = fromKey(k); return `${d.getMonth() + 1}月${d.getDate()}日`; }
 
 let toastTimer = null;
-function toast(text, ms = 4000, bad = false) {
+// action：{ label, run }，提示右邊多一顆按鈕
+function toast(text, ms = 4000, bad = false, action = null) {
   $('toastText').textContent = text;
   $('toast').classList.toggle('is-error', !!bad);
-  $('toastAction').hidden = true;
+  const btn = $('toastAction');
+  btn.hidden = !action;
+  btn.onclick = action ? () => { $('toast').hidden = true; action.run(); } : null;
+  if (action) btn.textContent = action.label;
   $('toast').hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, ms);
@@ -114,7 +119,7 @@ const FileChip = Node.create({
   renderHTML({ node }) {
     const { rel, name, size } = node.attrs;
     const ext = name.includes('.') ? name.split('.').pop().slice(0, 5).toUpperCase() : 'FILE';
-    return ['div', { 'data-file': rel, 'data-name': name, 'data-size': String(size), class: 'filechip', title: `${name}（點兩下，或選取後按 Enter 打開）` },
+    return ['div', { 'data-file': rel, 'data-name': name, 'data-size': String(size), ...(node.attrs.used ? { 'data-used': node.attrs.used } : {}), class: 'filechip', title: `${name}（點兩下，或選取後按 Enter 打開）` },
       ['span', { class: 'ext' }, ext], ['span', { class: 'name' }, name], ['span', { class: 'size' }, fmtSize(size)]];
   },
   renderText({ node }) { return node.attrs.name; },
@@ -200,6 +205,92 @@ const FallIn = Extension.create({
     })];
   },
 });
+// 「用過了」：撈回稿子的那一塊標起來，變灰、劃線。記在最上層區塊的 used 屬性（page.json 會存，index.md 不會）。
+const USED_TYPES = ['paragraph', 'heading', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock', 'image', 'fileChip', 'table'];
+const UsedMark = Extension.create({
+  name: 'usedMark',
+  addGlobalAttributes() {
+    return [{ types: USED_TYPES, attributes: { used: { default: null, parseHTML: (n) => n.getAttribute('data-used') || null, renderHTML: (a) => (a.used ? { 'data-used': a.used } : {}) } } }];
+  },
+});
+function toggleUsed(pos) {
+  if (pos == null || !editor) return;
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node || !USED_TYPES.includes(node.type.name) || (node.type.name === 'paragraph' && !node.content.size)) { toast('這一塊是空的，不用標', 2000); return; }
+  const used = node.attrs.used ? null : toKey(new Date());
+  editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, used }));
+  toast(used ? '標成用過了（再按一次取消）' : '取消「用過了」', 1800);
+}
+/* ---------- 最近刪除：整塊被刪掉的東西先收起來 ---------- */
+// 每次文件變動時，看哪些最上層區塊整塊不見了。同樣的東西在新文件裡還有（拖曳搬動、Alt+↑↓、只改了「用過了」）就不算刪。
+// 等 4 秒再寫進去：這段時間按 Ctrl+Z 救回來的，就不收。
+let pendingTrash = [];
+let trashTimer = null;
+const blockKey = (n) => `${n.type.name}|${n.textContent}|${n.attrs.src || n.attrs.rel || ''}`;
+function collectDeleted(tr) {
+  // 復原、重做造成的變動不收（例如撤回剛剛的貼上，那些東西本來就不想要）
+  if (!tr.docChanged || tr.getMeta('timeMark') || tr.getMeta('history$')) return;
+  const left = new Map();
+  tr.doc.forEach((n) => { const k = blockKey(n); left.set(k, (left.get(k) || 0) + 1); });
+  tr.before.forEach((n, pos) => {
+    if (!hasContent(n)) return;
+    if (tr.mapping.map(pos, 1) < tr.mapping.map(pos + n.nodeSize, -1)) return; // 還在，只是被改了
+    const k = blockKey(n);
+    if (left.get(k)) { left.set(k, left.get(k) - 1); return; }
+    const json = mapImages(JSON.parse(JSON.stringify(n.toJSON())), (src) => state.urlToRel[src] || src);
+    pendingTrash.push({ date: state.date, key: k, node: json, text: nodeText(json).replace(/\s+/g, ' ').trim() });
+  });
+  if (pendingTrash.length) { clearTimeout(trashTimer); trashTimer = setTimeout(flushTrash, 4000); }
+}
+async function flushTrash() {
+  clearTimeout(trashTimer);
+  if (!pendingTrash.length) return;
+  const here = new Set();
+  if (editor) editor.state.doc.forEach((n) => here.add(blockKey(n)));
+  const out = pendingTrash.filter((e) => !(e.date === state.date && here.has(e.key))).map(({ date, node, text }) => ({ date, node, text }));
+  pendingTrash = [];
+  if (out.length) { try { await dump.addTrash(out); } catch { /* 收不進最近刪除不影響編輯 */ } }
+}
+function fmtAgo(at) {
+  const d = new Date(at); const k = toKey(d);
+  const day = k === state.today ? '今天' : k === addDays(state.today, -1) ? '昨天' : fmtShort(k);
+  return `${day} ${pad(d.getHours())}:${pad(d.getMinutes())} 刪掉`;
+}
+async function openTrash() {
+  closeCalendar(); closeFormat();
+  $('settingsPanel').hidden = true; $('keysPanel').hidden = true;
+  await flushTrash();
+  const list = await dump.listTrash();
+  const box = $('trashList'); box.textContent = '';
+  if (!list.length) box.append(el('div', { class: 'note', text: '這 30 天沒有整塊刪掉的東西。' }));
+  else box.append(el('p', { class: 'trash-hint', text: '整塊刪掉的東西會在這裡留 30 天。按「放回去」會回到原本那一天的最後面。' }));
+  for (const e of list) {
+    const isFile = e.node.type === 'image' || e.node.type === 'fileChip';
+    const row = el('div', { class: 'trash-row' },
+      el('div', { class: 'trash-main' },
+        el('div', { class: 'trash-meta', text: `${fmtShort(e.date)} 那一頁・${fmtAgo(e.at)}` }),
+        el('div', { class: 'trash-text', text: e.text || (isFile ? '（圖片或檔案）' : '（沒有文字）') })),
+      el('button', { class: 'action', onclick: () => restoreTrash(e.id) }, '放回去'));
+    box.append(row);
+  }
+  $('trashPanel').hidden = false;
+  $('trashClose').focus();
+}
+function closeTrash() { $('trashPanel').hidden = true; focusEditor(); }
+async function restoreTrash(id) {
+  const e = await dump.takeTrash(id);
+  if (!e) { toast('這一塊已經不在最近刪除裡了', 3000); openTrash(); return; }
+  $('trashPanel').hidden = true;
+  if (e.date !== state.date) await goTo(e.date, null, true);
+  const node = editor.schema.nodeFromJSON(mapImages(e.node, (src) => state.relToUrl[src] || src));
+  const doc = editor.state.doc; const last = doc.lastChild;
+  const end = last && last.type.name === 'paragraph' && !last.content.size ? doc.content.size - last.nodeSize : doc.content.size;
+  editor.view.dispatch(editor.state.tr.insert(end, node).setMeta('fallIn', true));
+  setTimeout(() => { const dom = editor.view.nodeDOM(end); if (dom && dom.scrollIntoView) dom.scrollIntoView({ block: 'center' }); }, 0);
+  toast(`放回 ${fmtShort(e.date)} 那一頁的最後面`, 2500);
+}
+$('trashBtn').addEventListener('click', openTrash);
+$('trashClose').addEventListener('click', closeTrash);
 const MARK_GAP = 10 * 60 * 1000;
 const lastEditAt = {};
 let pendingMark = null;
@@ -385,7 +476,12 @@ function copyBlock(at) {
   view.focus();
   let ok = false;
   try { ok = document.execCommand('copy'); } catch { ok = false; }
-  if (ok) { view.dispatch(view.state.tr.setSelection(before)); toast('已複製整塊', 1500); }
+  if (ok) {
+    view.dispatch(view.state.tr.setSelection(before));
+    // 複製通常就是要撈回稿子：順手給一顆「標成用過了」
+    if (target.attrs.used) toast('已複製整塊', 1500);
+    else toast('已複製整塊', 4000, false, { label: '標成用過了', run: () => toggleUsed(pos) });
+  }
   else toast('這一塊已選取，請按 Ctrl+C 複製');
 }
 function makeGrip() {
@@ -417,7 +513,10 @@ function makeGrip() {
     if (editor) editor.view.dragging = null;
     hideGrip();
   });
-  const wrap = el('div', { class: 'gutter' }, copy, g);
+  const usedBtn = el('button', { class: 'gutter-btn', tabindex: '-1', title: '標成用過了／取消（Ctrl+Shift+U）', 'aria-label': '標成用過了', onclick: () => toggleUsed(grip.pos) });
+  usedBtn.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" class="line"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>';
+  usedBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  const wrap = el('div', { class: 'gutter' }, usedBtn, copy, g);
   wrap.hidden = true;
   grip.el = wrap; grip.handle = g;
   $('editor').append(wrap);
@@ -517,7 +616,7 @@ function makeEditor(doc) {
       BlockImage.configure({ inline: false, allowBase64: true }),
       TaskList, TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-      FileChip, TimeMark, BlockNumbers, FallIn,
+      FileChip, TimeMark, BlockNumbers, FallIn, UsedMark,
       Placeholder.configure({ placeholder: state.date === state.today ? '把剪下來的段落貼在這裡，或直接打字、拖檔案進來。打 / 放圖片、檔案，或換格式。' : `${fmtShort(state.date)} 這天沒有東西。直接打字或貼上就會記在這天。` }),
       Markdown.configure({ html: false, linkify: true, breaks: true, transformPastedText: true, transformCopiedText: false }),
     ],
@@ -563,6 +662,7 @@ function makeEditor(doc) {
         const sel = editor.state.selection;
         if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && sel instanceof NodeSelection && openNode(sel.node)) { event.preventDefault(); return true; }
         if (event.ctrlKey && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') { event.preventDefault(); copyBlock(currentBlockPos()); return true; }
+        if (event.ctrlKey && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'u') { event.preventDefault(); toggleUsed(currentBlockPos()); return true; }
         if (event.altKey && !event.ctrlKey && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
           event.preventDefault();
           return moveBlock(event.key === 'ArrowUp' ? -1 : 1);
@@ -576,7 +676,7 @@ function makeEditor(doc) {
       },
     },
     onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; $('emptyCan').hidden = !editor.isEmpty; },
-    onUpdate({ transaction }) { $('emptyCan').hidden = !editor.isEmpty; if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
+    onUpdate({ transaction }) { $('emptyCan').hidden = !editor.isEmpty; if (!state.loading) { collectDeleted(transaction); keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
     onSelectionUpdate() { updateSlash(false); bubbleOnSelection(); },
     onTransaction() { $('emptyCan').hidden = !editor.isEmpty; if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
     onBlur({ event }) { const to = event && event.relatedTarget; if (!bubble.linking && !(to && ($('bubble').contains(to) || $('turnMenu').contains(to)))) closeBubble(); },
@@ -764,6 +864,7 @@ async function load(find, stay) {
 
 async function goTo(k, find, stay) {
   await flush();
+  await flushTrash();
   state.date = k;
   await load(find, stay);
 }
@@ -779,7 +880,7 @@ async function pickFiles() {
 }
 $('attachBtn').addEventListener('click', pickFiles);
 
-const overlayOpen = () => !$('settingsPanel').hidden || !$('keysPanel').hidden;
+const overlayOpen = () => !$('settingsPanel').hidden || !$('keysPanel').hidden || !$('trashPanel').hidden;
 
 // 點頁面下方的空白處，游標就到最後
 page.addEventListener('mousedown', (e) => { if (e.target === page) { e.preventDefault(); focusEditor(); } });
@@ -1147,13 +1248,71 @@ async function runSearch() {
   if (q !== $('searchInput').value.trim()) return;
   box.textContent = '';
   if (!results.length) { box.append(el('div', { class: 'note', text: `找不到「${q}」。` })); return; }
-  for (const r of results) {
-    const lines = el('span', { class: 'lines' });
-    for (const line of r.lines) lines.append(el('span', { class: 'snippet' }, highlight(line, words)));
-    if (r.more) lines.append(el('span', { class: 'kind', text: `還有 ${r.more} 行` }));
-    box.append(el('button', { class: 'result', onclick: () => { closeNarrowSide(); goTo(r.date, words[0]); } },
-      el('span', { class: 'result-date', text: `${fmtDate(r.date)} ${WEEKDAYS[fromKey(r.date).getDay()]}` }), lines));
+  // 結果直接是命中的那一整塊：看得到全文，旁邊就能複製，不用先跳到那一天
+  let shown = 0;
+  for (const r of results.slice(0, 40)) {
+    const page = r.date === state.date ? { doc: editor.getJSON() } : await dump.getPage(r.date);
+    if (q !== $('searchInput').value.trim()) return;
+    const blocks = ((page.doc && page.doc.content) || []).map((n, index) => ({ n, index, text: nodeText(n).trim() }))
+      .filter((b) => b.text && b.n.type !== 'timeMark' && words.some((w) => b.text.toLowerCase().includes(w)));
+    if (!blocks.length) continue;
+    box.append(el('div', { class: 'result-date sticky', text: `${fmtDate(r.date)} ${WEEKDAYS[fromKey(r.date).getDay()]}` }));
+    for (const b of blocks.slice(0, 8)) {
+      shown++;
+      const used = b.n.attrs && b.n.attrs.used;
+      box.append(el('div', { class: `hit${used ? ' used' : ''}` },
+        el('button', { class: 'hit-text', title: '跳到那一天的這一塊', onclick: () => { closeNarrowSide(); goToBlock(r.date, b.index); } }, highlightAll(b.text, words)),
+        el('button', { class: 'hit-copy', title: '複製這一塊（含格式）', 'aria-label': '複製這一塊', onclick: () => copyJson(b.n) }, svgIcon('<rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5.5a2 2 0 00-2-2H5.5a2 2 0 00-2 2V11a2 2 0 002 2H7"/>'))));
+    }
+    if (blocks.length > 8) box.append(el('div', { class: 'kind more', text: `這天還有 ${blocks.length - 8} 塊` }));
   }
+  if (!shown) box.append(el('div', { class: 'note', text: `找不到「${q}」。` }));
+}
+// 整塊都標出命中的字；太長只留前 600 字
+function highlightAll(text, words) {
+  const frag = document.createDocumentFragment();
+  const s = text.length > 600 ? `${text.slice(0, 600)}…` : text;
+  const sl = s.toLowerCase();
+  let pos = 0;
+  while (pos < s.length) {
+    let best = -1; let len = 0;
+    for (const w of words) { const i = sl.indexOf(w, pos); if (i >= 0 && (best < 0 || i < best)) { best = i; len = w.length; } }
+    if (best < 0) { frag.append(s.slice(pos)); break; }
+    frag.append(s.slice(pos, best), el('mark', { text: s.slice(best, best + len) }));
+    pos = best + len;
+  }
+  return frag;
+}
+// 把別天的一塊（JSON）複製到剪貼簿：貼到 Word、Notion 有格式，貼到純文字的地方就是字
+function copyJson(json) {
+  try {
+    const node = editor.schema.nodeFromJSON(json);
+    const div = document.createElement('div');
+    div.append(DOMSerializer.fromSchema(editor.schema).serializeNode(node));
+    const text = nodeText(json).trim();
+    // 用 copy 事件塞內容，跟「複製整塊」一樣不需要額外的剪貼簿權限
+    const onCopy = (ev) => { ev.preventDefault(); ev.clipboardData.setData('text/html', div.innerHTML); ev.clipboardData.setData('text/plain', text); };
+    document.addEventListener('copy', onCopy, { once: true });
+    const ok = document.execCommand('copy');
+    document.removeEventListener('copy', onCopy);
+    if (!ok) throw new Error('瀏覽器不讓複製');
+    toast('已複製這一塊', 1500);
+  } catch (err) { toast(`沒複製成功（${err.message || err}）`, 4000, true); }
+}
+// 跳到某一天的第幾塊，捲到中間、閃一下
+async function goToBlock(date, index) {
+  if (date !== state.date) await goTo(date, null, true);
+  const doc = editor.state.doc;
+  if (index >= doc.childCount) return;
+  let pos = 0;
+  for (let i = 0; i < index; i++) pos += doc.child(i).nodeSize;
+  const dom = editor.view.nodeDOM(pos);
+  if (!dom || !dom.scrollIntoView) return;
+  dom.scrollIntoView({ block: 'center' });
+  dom.classList.remove('found'); void dom.offsetWidth; dom.classList.add('found');
+  setTimeout(() => dom.classList.remove('found'), 1800);
+  editor.chain().focus().setTextSelection(pos + 1).run();
+  dom.scrollIntoView({ block: 'center' });
 }
 const searching = () => document.activeElement === $('searchInput') || !!$('searchInput').value;
 function openSearch() {
@@ -1166,18 +1325,18 @@ function closeSearch() { $('searchInput').value = ''; runSearch(); focusEditor()
 $('searchInput').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 150); });
 $('searchInput').addEventListener('keydown', (e) => {
   if (e.isComposing || e.keyCode === 229) return;
-  if (e.key === 'ArrowDown' || e.key === 'Enter') { const first = $('searchResults').querySelector('.result'); if (first) { e.preventDefault(); first.focus(); } }
+  if (e.key === 'ArrowDown' || e.key === 'Enter') { const first = $('searchResults').querySelector('.hit-text'); if (first) { e.preventDefault(); first.focus(); } }
 });
 $('searchResults').addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-  const items = [...$('searchResults').querySelectorAll('.result')];
+  const items = [...$('searchResults').querySelectorAll('.hit-text')];
   const i = items.indexOf(document.activeElement);
   if (i < 0) return;
   e.preventDefault();
   if (e.key === 'ArrowUp' && i === 0) $('searchInput').focus();
   else (items[i + (e.key === 'ArrowDown' ? 1 : -1)] || items[i]).focus();
 });
-for (const id of ['settingsPanel', 'keysPanel']) {
+for (const id of ['settingsPanel', 'keysPanel', 'trashPanel']) {
   $(id).addEventListener('mousedown', (e) => { if (e.target === $(id)) { $(id).hidden = true; focusEditor(); } });
 }
 
@@ -1239,6 +1398,15 @@ hotkeyInput.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 頂列與鍵盤 ---------- */
+// 釘在最上層＋窄版（Windows 版由主程序縮視窗、設最上層）
+let pinned = false;
+async function togglePin() {
+  pinned = !!(await dump.pin(!pinned));
+  $('pinBtn').setAttribute('aria-pressed', pinned ? 'true' : 'false');
+  $('pinBtn').classList.toggle('on', pinned);
+  if (pinned) toast('釘住了，會一直浮在最上層。再按一次圖釘回到原本大小', 3000);
+}
+$('pinBtn').addEventListener('click', togglePin);
 $('prevWeek').addEventListener('click', () => goTo(addDays(state.date, -7)));
 $('nextWeek').addEventListener('click', () => goTo(addDays(state.date, 7)));
 $('todayBtn').addEventListener('click', () => goToday());
@@ -1252,12 +1420,14 @@ document.addEventListener('keydown', (e) => {
     else if (!$('calendar').hidden) { closeCalendar(); focusEditor(); }
     else if (!$('settingsPanel').hidden) closeSettings();
     else if (!$('keysPanel').hidden) closeKeys();
+    else if (!$('trashPanel').hidden) closeTrash();
     else if (searching()) closeSearch();
     else if (narrowQuery.matches && side.narrowOpen) { setSide(false); focusEditor(); }
     else flush().then(() => dump.hide());
     return;
   }
   if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); openSearch(); return; }
+  if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p') { e.preventDefault(); togglePin(); return; }
   if (ctrl && e.key === ',') { e.preventDefault(); openSettings(); return; }
   if (ctrl && e.key === '\\') { e.preventDefault(); const on = !sideVisible(); setSide(on); if (!on) focusEditor(); return; }
   if (ctrl && e.key === '/') { e.preventDefault(); if ($('keysPanel').hidden) openKeys(); else closeKeys(); return; }
@@ -1273,10 +1443,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 主程序來的訊息 ---------- */
-dump.on('go-today', () => { $('settingsPanel').hidden = true; $('keysPanel').hidden = true; closeCalendar(); goToday(); });
+dump.on('go-today', () => { $('settingsPanel').hidden = true; $('keysPanel').hidden = true; $('trashPanel').hidden = true; closeCalendar(); goToday(); });
 dump.on('open-settings', openSettings);
 dump.on('vault:changed', async () => { state.dirty = false; await refreshCounts(); await load(); await refreshDays(); });
-dump.on('flush', () => { flush().then(() => { if (dump.flushed) dump.flushed(); }); });
+dump.on('flush', () => { Promise.all([flush(), flushTrash()]).then(() => { if (dump.flushed) dump.flushed(); }); });
 window.addEventListener('blur', () => { flush(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 window.addEventListener('focus', () => {

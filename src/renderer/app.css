@@ -13,7 +13,7 @@
   --bar-h: 52px;
   --ctl-h: 32px;
   --doc-w: 720px;
-  --gutter-w: 54px;
+  --gutter-w: 80px;
   --doc-top: 40px;
   --num-w: 36px;
   --side-w: 248px;
@@ -53,7 +53,7 @@ kbd {
 }
 .btn:hover { background: var(--ap-fill); color: var(--ap-text); }
 .btn:active { transform: scale(0.96); background: var(--ap-fill-hover); }
-.btn[aria-expanded="true"] { background: var(--ap-accent-bg); color: var(--ap-accent-text); }
+.btn.on, .btn[aria-expanded="true"] { background: var(--ap-accent-bg); color: var(--ap-accent-text); }
 .action {
   padding: var(--sp-1_5) var(--sp-4); border-radius: var(--r-sm); border: 0.5px solid var(--ap-border-strong);
   background: var(--ap-surface); color: var(--ap-text-body); font-size: var(--fs-body);
@@ -143,6 +143,24 @@ body.side-off .side { display: none; }
 .side-foot .btn { font-weight: 400; color: var(--ap-text-2); }
 .side .result { padding: var(--sp-2); }
 .side .result .snippet { font-size: var(--fs-small); }
+/* 搜尋結果：一塊一塊直接列出來，右邊一顆複製 */
+.side .result-date.sticky { position: sticky; top: 0; z-index: 1; padding: var(--sp-2) var(--sp-2) var(--sp-1); background: var(--ap-bg); }
+.hit { position: relative; display: flex; align-items: flex-start; border-radius: var(--r-md); transition: background var(--dur-fast) ease; }
+.hit:hover, .hit:focus-within { background: var(--ap-fill); }
+.hit-text {
+  flex: 1; min-width: 0; padding: var(--sp-1_5) var(--sp-1) var(--sp-1_5) var(--sp-2); border: 0; background: transparent; text-align: left;
+  color: var(--ap-text-body); font-size: var(--fs-small); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden;
+}
+.hit-text:focus-visible { outline-offset: -2px; }
+.hit-text mark { background: var(--ap-highlight); color: inherit; border-radius: var(--r-xs); }
+.hit.used .hit-text { color: var(--ap-text-3); text-decoration: line-through; }
+.hit-copy { flex: none; width: 28px; height: 28px; margin: var(--sp-1) var(--sp-1) 0 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ap-text-3); display: grid; place-items: center; opacity: 0; transition: opacity var(--dur-fast) ease, background var(--dur-fast) ease; }
+.hit:hover .hit-copy, .hit:focus-within .hit-copy { opacity: 1; }
+.hit-copy:hover { background: var(--ap-fill-hover); color: var(--ap-text); }
+.side .kind.more { display: block; padding: 0 var(--sp-2) var(--sp-1); font-size: var(--fs-caption); color: var(--ap-text-3); }
+/* 從搜尋跳過來的那一塊閃一下 */
+.doc .ProseMirror > .found { animation: fall-flash 1.6s ease; border-radius: var(--r-sm); }
 .side .note { padding: var(--sp-3) var(--sp-2); font-size: var(--fs-small); }
 
 /* ---------- 這一天 ---------- */
@@ -222,6 +240,10 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 .doc .ProseMirror-gapcursor::after { border-top-color: var(--ap-text); }
 .doc p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--ap-text-3); float: left; height: 0; pointer-events: none; }
 .doc ::selection { background: var(--ap-accent-bg-hover); }
+
+/* 「用過了」的那幾塊：變淡、劃線，一眼看出已經撈回稿子 */
+.doc .ProseMirror > [data-used] { opacity: 0.45; text-decoration: line-through; text-decoration-color: var(--ap-text-3); transition: opacity var(--dur-fast) ease; }
+.doc .ProseMirror > [data-used]:hover { opacity: 0.8; }
 
 /* 剛丟進來的那幾塊：從上面掉下來、彈一下落地，再閃一下淡綠（.fall-in 由 app.src.js 的 FallIn 標上） */
 .doc .ProseMirror > .fall-in { border-radius: var(--r-sm); animation: fall-in 0.7s cubic-bezier(.3, 1.4, .5, 1) both, fall-flash 1.6s ease 0.6s; }
@@ -359,6 +381,14 @@ main { position: relative; }
 .result .kind { color: var(--ap-text-2); font-size: var(--fs-small); }
 .result mark { background: var(--ap-highlight); color: inherit; border-radius: var(--r-xs); }
 .note { color: var(--ap-text-2); padding: var(--sp-5) var(--sp-2_5); }
+
+/* 最近刪除 */
+.trash-hint { margin: var(--sp-1) var(--sp-2_5) var(--sp-2); color: var(--ap-text-2); font-size: var(--fs-small); }
+.trash-row { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-2_5); border-top: 1px solid var(--ap-sep-soft); }
+.trash-main { flex: 1; min-width: 0; }
+.trash-meta { color: var(--ap-text-2); font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
+.trash-text { margin-top: var(--sp-0_5); color: var(--ap-text-body); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+.trash-row .action { flex: none; }
 
 .settings { padding: var(--sp-1) var(--sp-4) var(--sp-4); }
 .settings h3 { margin: var(--sp-4) 0 var(--sp-1_5); font-size: var(--fs-caption); font-weight: 600; letter-spacing: 0.02em; color: var(--ap-text-2); }

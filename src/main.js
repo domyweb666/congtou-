@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, shell, nativeImage, nativeTheme, net } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, dialog, shell, nativeImage, nativeTheme, net, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -19,6 +19,7 @@ let store = null;
 let settings = { ...DEFAULTS };
 let quitting = false;
 let flushed = false;
+let unpinned = null; // 釘在最上層之前的視窗位置；沒釘時是 null
 
 if (process.env.DAILY_DUMP_USERDATA) app.setPath('userData', process.env.DAILY_DUMP_USERDATA);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -68,7 +69,8 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.once('ready-to-show', () => { if (!process.argv.includes('--hidden')) win.show(); });
 
-  const remember = () => { if (win && !win.isMinimized() && !win.isMaximized()) settings.bounds = win.getBounds(); };
+  // 釘著的窄條不記，下次開還是原本的大小
+  const remember = () => { if (win && !unpinned && !win.isMinimized() && !win.isMaximized()) settings.bounds = win.getBounds(); };
   win.on('resized', remember);
   win.on('moved', remember);
   win.on('close', (e) => {
@@ -84,7 +86,7 @@ function createWindow() {
     }
   });
   win.on('hide', () => { if (win) win.webContents.send('flush'); });
-  win.on('closed', () => { win = null; flushed = false; });
+  win.on('closed', () => { win = null; flushed = false; unpinned = null; });
   // 右鍵選單：Windows 的基本動作都要在（每一項在別處也有入口，這裡不放獨家指令）。
   win.webContents.on('context-menu', (_e, p) => {
     const items = [];
@@ -193,6 +195,9 @@ function registerIpc() {
   ipcMain.handle('url:open', (_e, url) => { if (/^https?:/i.test(url)) shell.openExternal(url); });
   ipcMain.handle('url:title', (_e, url) => fetchTitle(url));
   ipcMain.handle('search', (_e, q) => store.search(q));
+  ipcMain.handle('trash:add', (_e, entries) => store.addTrash(entries));
+  ipcMain.handle('trash:list', () => store.listTrash());
+  ipcMain.handle('trash:take', (_e, id) => store.takeTrash(id));
 
   ipcMain.handle('settings:get', () => ({ ...settings, packaged: app.isPackaged }));
   ipcMain.handle('settings:set', (_e, patch) => {
@@ -226,6 +231,23 @@ function registerIpc() {
     return r.canceled ? [] : r.filePaths;
   });
   ipcMain.handle('window:hide', () => { if (win) { if (settings.closeToTray) win.hide(); else win.minimize(); } });
+  // 釘在最上層＋窄版：縮成一條貼在螢幕右邊、浮在所有視窗上面；再按一次回到原本的大小和位置
+  ipcMain.handle('window:pin', (_e, on) => {
+    if (!win) return false;
+    if (on && !unpinned) {
+      if (win.isMaximized()) win.unmaximize();
+      unpinned = win.getBounds();
+      const wa = screen.getDisplayMatching(unpinned).workArea;
+      const width = 400;
+      win.setAlwaysOnTop(true, 'floating');
+      win.setBounds({ x: wa.x + wa.width - width, y: wa.y, width, height: wa.height });
+    } else if (!on && unpinned) {
+      win.setAlwaysOnTop(false);
+      win.setBounds(unpinned);
+      unpinned = null;
+    }
+    return !!unpinned;
+  });
 }
 
 if (!app.requestSingleInstanceLock()) {
