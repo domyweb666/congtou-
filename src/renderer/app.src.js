@@ -578,7 +578,7 @@ function makeEditor(doc) {
     onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; $('emptyCan').hidden = !editor.isEmpty; },
     onUpdate({ transaction }) { $('emptyCan').hidden = !editor.isEmpty; if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
     onSelectionUpdate() { updateSlash(false); bubbleOnSelection(); },
-    onTransaction() { if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
+    onTransaction() { $('emptyCan').hidden = !editor.isEmpty; if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
     onBlur({ event }) { const to = event && event.relatedTarget; if (!bubble.linking && !(to && ($('bubble').contains(to) || $('turnMenu').contains(to)))) closeBubble(); },
   });
   makeGrip();
@@ -704,14 +704,32 @@ applySide();
 /* ---------- 週條與標題 ---------- */
 
 // 頂列只剩一顆日期鈕；不在今天時才出現「回今天」
-function renderWeek() { $('todayBtn').hidden = state.date === state.today; }
+// 頂列中間是一整週（週一到週日），正在看的那天是綠色膠囊，今天前面有一個點；
+// 沒丟東西的日子字淡一點。視窗變窄時，離正在看的那天比較遠的先藏起來（data-off 給 CSS 用）。
+function renderWeek() {
+  const d = fromKey(state.date);
+  const monday = addDays(state.date, -((d.getDay() + 6) % 7));
+  const box = $('weekDays');
+  box.textContent = '';
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(monday, i);
+    const day = fromKey(k);
+    const cur = k === state.date;
+    box.append(el('button', {
+      class: `wd${cur ? ' current' : ''}${k === state.today ? ' today' : ''}${state.counts[k] ? '' : ' blank'}`,
+      'data-off': String(Math.abs(i - ((d.getDay() + 6) % 7))),
+      'aria-current': cur ? 'date' : null,
+      title: `${fmtDate(k)} ${WEEKDAYS[day.getDay()]}${k === state.today ? '（今天）' : ''}`,
+      onclick: () => { if (k !== state.date) goTo(k); else focusEditor(); },
+    }, el('span', { class: 'wd-name', text: `週${SHORT[day.getDay()]}` }), el('span', { class: 'wd-num', text: String(day.getDate()) })));
+  }
+  $('todayBtn').classList.toggle('is-today', state.date === state.today);
+}
 
 function renderHeading() {
   const d = fromKey(state.date);
-  const thisYear = d.getFullYear() === fromKey(state.today).getFullYear();
-  $('dateTitle').textContent = thisYear ? fmtShort(state.date) : fmtDate(state.date);
-  $('weekday').textContent = WEEKDAYS[d.getDay()];
-  $('todayBadge').hidden = state.date !== state.today;
+  $('phWeekday').textContent = state.date === state.today ? `${WEEKDAYS[d.getDay()]}・今天` : WEEKDAYS[d.getDay()];
+  $('phDate').textContent = fmtDate(state.date);
   document.title = state.date === state.today ? '蔥蔥丟' : `蔥蔥丟 — ${fmtShort(state.date)}`;
 }
 function setSaveState(text, bad) { const n = $('saveState'); n.textContent = text; n.classList.toggle('bad', !!bad); }
@@ -1221,8 +1239,8 @@ hotkeyInput.addEventListener('keydown', (e) => {
 });
 
 /* ---------- 頂列與鍵盤 ---------- */
-$('prevDay').addEventListener('click', () => goTo(addDays(state.date, -1)));
-$('nextDay').addEventListener('click', () => goTo(addDays(state.date, 1)));
+$('prevWeek').addEventListener('click', () => goTo(addDays(state.date, -7)));
+$('nextWeek').addEventListener('click', () => goTo(addDays(state.date, 7)));
 $('todayBtn').addEventListener('click', () => goToday());
 
 document.addEventListener('keydown', (e) => {

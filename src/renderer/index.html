@@ -31,20 +31,27 @@
 <div class="right">
 <header class="bar">
   <button class="btn" id="sideShow" title="打開側邊欄（Ctrl+\）" aria-label="打開側邊欄" hidden><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button>
-  <button class="btn" id="prevDay" title="前一天（Alt+←）" aria-label="前一天"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg></button>
-  <button class="btn date" id="calBtn" title="挑別的日子（Ctrl+G）" aria-haspopup="dialog" aria-expanded="false">
-    <b id="dateTitle"></b><span class="weekday" id="weekday"></span><span class="badge" id="todayBadge" hidden>今天</span>
-    <svg class="ic chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8"/></svg>
-  </button>
-  <button class="btn" id="nextDay" title="後一天（Alt+→）" aria-label="後一天"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4l6 6-6 6"/></svg></button>
-  <button class="btn" id="todayBtn" title="回到今天（Ctrl+T）" hidden>回今天</button>
+  <span class="spacer"></span>
+  <nav class="week" aria-label="這一週的日子">
+    <button class="btn" id="prevWeek" title="上一週（Alt+PageUp）" aria-label="上一週"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <div class="week-days" id="weekDays"></div>
+    <button class="btn" id="nextWeek" title="下一週（Alt+PageDown）" aria-label="下一週"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4l6 6-6 6"/></svg></button>
+  </nav>
   <span class="spacer"></span>
   <span class="save-state" id="saveState" role="status" aria-live="polite"></span>
+  <div class="today-group">
+    <button class="btn" id="todayBtn" title="回到今天（Ctrl+T）">今天</button>
+    <button class="btn" id="calBtn" title="用月曆挑日子（Ctrl+G）" aria-label="用月曆挑日子" aria-haspopup="dialog" aria-expanded="false"><svg class="ic chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8"/></svg></button>
+  </div>
   <button class="btn" id="attachBtn" title="放圖片或檔案進這一頁（Ctrl+O，或在頁面裡打 /）" aria-label="放圖片或檔案進這一頁"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M14.5 9.5l-5 5a3 3 0 01-4.2-4.2l6-6a2 2 0 012.8 2.8l-5.8 5.8a1 1 0 01-1.4-1.4l5-5"/></svg></button>
   <button class="btn" id="formatBtn" title="更多：格式、複製這一塊、快捷鍵、設定" aria-label="更多" aria-haspopup="menu" aria-expanded="false"><svg class="ic solid" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.4"/><circle cx="10" cy="10" r="1.4"/><circle cx="15.5" cy="10" r="1.4"/></svg></button>
 </header>
 
 <main id="page">
+  <div class="page-head">
+    <div class="ph-weekday" id="phWeekday"></div>
+    <h1 class="ph-date" id="phDate"></h1>
+  </div>
   <div id="editor" class="doc"></div>
   <div class="empty-can" id="emptyCan" aria-hidden="true" hidden>
     <span class="can can-lg" data-can></span>

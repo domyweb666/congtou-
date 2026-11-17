@@ -70,15 +70,40 @@ kbd {
 }
 .spacer { flex: 1; min-width: var(--sp-1); }
 .bar-sep { width: 1px; height: var(--sp-5); margin: 0 var(--sp-1); background: var(--ap-sep); flex: none; }
-.btn.date { gap: var(--sp-2); padding: 0 var(--sp-2) 0 var(--sp-2_5); color: var(--ap-text); min-width: 0; flex: 0 1 auto; }
-.btn.date b { font-size: var(--fs-heading); font-weight: 600; white-space: nowrap; }
-.btn.date .weekday { color: var(--ap-text-2); font-size: var(--fs-small); font-weight: 400; }
-.btn.date .chev { width: 12px; height: 12px; color: var(--ap-text-3); }
-.badge {
-  padding: 1px var(--sp-2); border-radius: var(--r-full);
-  background: var(--ap-accent-bg); color: var(--ap-accent-deep); font-size: var(--fs-caption); font-weight: 600;
+/* 一整週的日期條：週一到週日，正在看的那天是綠色膠囊，今天前面有個點 */
+.bar { container-type: inline-size; container-name: bar; }
+.week { display: flex; align-items: center; gap: var(--sp-0_5); flex: 0 1 auto; min-width: 0; }
+.week-days { display: flex; gap: var(--sp-0_5); }
+.wd {
+  height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: var(--r-md); background: transparent;
+  display: inline-flex; align-items: center; gap: var(--sp-1); white-space: nowrap;
+  color: var(--ap-text-body); font-size: var(--fs-small); font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
-#todayBtn { color: var(--ap-accent-text); }
+.wd:hover { background: var(--ap-fill); color: var(--ap-text); }
+.wd .wd-name { color: var(--ap-text-2); }
+.wd .wd-num { font-weight: 600; }
+.wd.blank, .wd.blank .wd-name { color: var(--ap-text-3); }
+.wd.today::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--ap-accent); flex: none; }
+.wd.current, .wd.current .wd-name { background: var(--ap-accent); color: var(--ap-accent-on); }
+.wd.current.today::before { background: var(--ap-accent-on); }
+.wd.current:hover { background: var(--ap-accent-hover, var(--ap-accent)); }
+@container bar (max-width: 780px) { .wd[data-off="6"], .wd[data-off="5"], .wd[data-off="4"] { display: none; } }
+@container bar (max-width: 600px) { .wd[data-off="3"], .wd[data-off="2"] { display: none; } }
+@container bar (max-width: 440px) { .wd[data-off="1"] { display: none; } }
+
+/* 右邊「今天」＋月曆，像一顆分成兩半的按鈕 */
+.today-group { display: inline-flex; align-items: center; flex: none; border: 1px solid var(--ap-sep); border-radius: var(--r-md); }
+.today-group .btn { height: 28px; border-radius: 0; font-weight: 500; }
+.today-group .btn:first-child { border-radius: var(--r-md) 0 0 var(--r-md); padding: 0 var(--sp-2_5); }
+.today-group .btn:last-child { border-radius: 0 var(--r-md) var(--r-md) 0; min-width: 26px; padding: 0 var(--sp-1); border-left: 1px solid var(--ap-sep); }
+.today-group .chev { width: 12px; height: 12px; color: var(--ap-text-2); }
+#todayBtn.is-today { color: var(--ap-text-2); }
+
+/* 頁面最上面的大日期 */
+.page-head { max-width: var(--doc-w); margin: 0 auto var(--sp-5); user-select: none; }
+.ph-weekday { color: var(--ap-accent-text); font-size: var(--fs-small); font-weight: 600; }
+.ph-date { margin: var(--sp-0_5) 0 0; font-family: var(--doc-font); font-size: 28px; font-weight: 700; line-height: 1.25; color: var(--ap-text); font-variant-numeric: tabular-nums; }
 .ic.solid { fill: currentColor; stroke: none; }
 .save-state { margin-right: var(--sp-1); color: var(--ap-text-2); font-size: var(--fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .save-state.bad { color: var(--ap-danger); font-weight: 600; }
