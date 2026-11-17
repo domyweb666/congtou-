@@ -10,13 +10,13 @@
 
 ## 下載
 
-目前版本 0.5.0。點檔名直接下載：
+目前版本 0.6.0。點檔名直接下載：
 
 | 你的電腦 | 下載 |
 |---|---|
-| Windows | [congcongdiu-0.5.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-win-x64-setup.exe)（安裝檔，122 MB） |
-| Mac，M 系列晶片 | [congcongdiu-0.5.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-mac-arm64.dmg)（120 MB） |
-| Mac，Intel | [congcongdiu-0.5.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-mac-x64.dmg)（127 MB） |
+| Windows | [congcongdiu-0.6.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-win-x64-setup.exe)（安裝檔，122 MB） |
+| Mac，M 系列晶片 | [congcongdiu-0.6.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-mac-arm64.dmg)（121 MB） |
+| Mac，Intel | [congcongdiu-0.6.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-mac-x64.dmg)（128 MB） |
 
 第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
 
@@ -154,13 +154,11 @@ npm run pack:win
 - `congcongdiu-版號-mac-arm64.dmg`：M 系列晶片的 Mac
 - `congcongdiu-版號-mac-x64.dmg`：Intel 的 Mac
 
-Mac 版要在 Mac 上打包。這個 repo 有一支 GitHub Actions 幫忙做：到 Actions 頁籤選「打包」，按 Run workflow，跑完在那一次執行的頁面最下面下載。自己有 Mac 的話，直接跑 `npm install` 和 `npm run pack:mac` 也可以。
+Mac 版要在 Mac 上打包。這個 repo 有一支 GitHub Actions 幫忙做：到 Actions 頁籤選「打包」，按 Run workflow，跑完在那一次執行的頁面最下面下載。自己有 Mac 的話，直接跑 `npm install` 和 `npm run pack:mac` 也可以（沒有憑證時要加 `-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false` 改回本機簽章）。
 
-這個 app 沒有 Apple 開發者簽章，第一次打開 macOS 會擋。對 `蔥蔥丟.app` 按右鍵選「打開」，再按一次「打開」。還是打不開就在終端機跑：
+從 0.6.0 起，Mac 版用 Developer ID 簽章並通過 Apple 公證，打開 `.dmg`、把蔥蔥丟拖進「應用程式」就能直接用，macOS 不會再擋。簽章用的憑證和金鑰放在 GitHub 的 Secrets，設定方法見 [Mac簽章設定.md](Mac簽章設定.md)。
 
-```
-xattr -cr /Applications/蔥蔥丟.app
-```
+0.5.0 以前的 Mac 版沒有簽章，第一次打開要對 `蔥蔥丟.app` 按右鍵選「打開」。
 
 Mac 版目前只確認打包得出來，沒有在 Mac 上實際用過。系統匣、全域快捷鍵、開機啟動在 Mac 上的行為還沒驗。
 

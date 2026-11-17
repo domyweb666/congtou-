@@ -4,6 +4,8 @@
 
 只要做一次。憑證五年後到期，到時候再做一次。
 
+> 目前實際的做法（2026-11-18）：憑證沿用 `~/topoi-signing` 那張（`bash scripts/mac-cert.sh reuse`），公證改用 App Store Connect API 金鑰 `github-ci`（`bash scripts/mac-cert.sh apikey`），不用 App 專用密碼。下面第 1～4 步是從零開始的版本，留著備用。
+
 ## 1. 產生憑證申請檔
 
 在專案資料夾開 Git Bash，跑：
