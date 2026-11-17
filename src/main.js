@@ -20,6 +20,8 @@ let settings = { ...DEFAULTS };
 let quitting = false;
 let flushed = false;
 let unpinned = null; // 釘在最上層之前的視窗位置；沒釘時是 null
+const MIN_W = 600;   // 平常的最小寬度
+const PIN_W = 420;   // 釘在最上層時的窄條寬度
 
 if (process.env.DAILY_DUMP_USERDATA) app.setPath('userData', process.env.DAILY_DUMP_USERDATA);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -56,7 +58,8 @@ function createWindow() {
   const b = settings.bounds || DEFAULTS.bounds;
   win = new BrowserWindow({
     width: b.width, height: b.height, x: b.x, y: b.y,
-    minWidth: 340, minHeight: 380,
+    // 跟 Heptabase 一樣：最小視窗固定，再小頂列就排不下（釘在最上層時另外放寬，見 window:pin）
+    minWidth: MIN_W, minHeight: 480,
     title: APP_NAME,
     icon: asset('icon.png'),
     show: false,
@@ -238,12 +241,14 @@ function registerIpc() {
       if (win.isMaximized()) win.unmaximize();
       unpinned = win.getBounds();
       const wa = screen.getDisplayMatching(unpinned).workArea;
-      const width = 400;
+      const width = PIN_W;
+      win.setMinimumSize(PIN_W, 480);
       win.setAlwaysOnTop(true, 'floating');
       win.setBounds({ x: wa.x + wa.width - width, y: wa.y, width, height: wa.height });
     } else if (!on && unpinned) {
       win.setAlwaysOnTop(false);
       win.setBounds(unpinned);
+      win.setMinimumSize(MIN_W, 480);
       unpinned = null;
     }
     return !!unpinned;

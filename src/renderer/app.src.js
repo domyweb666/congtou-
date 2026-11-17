@@ -675,10 +675,10 @@ function makeEditor(doc) {
         return false;
       },
     },
-    onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; $('emptyCan').hidden = !editor.isEmpty; },
-    onUpdate({ transaction }) { $('emptyCan').hidden = !editor.isEmpty; if (!state.loading) { collectDeleted(transaction); keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
+    onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; },
+    onUpdate({ transaction }) { if (!state.loading) { collectDeleted(transaction); keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
     onSelectionUpdate() { updateSlash(false); bubbleOnSelection(); },
-    onTransaction() { $('emptyCan').hidden = !editor.isEmpty; if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
+    onTransaction() { if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
     onBlur({ event }) { const to = event && event.relatedTarget; if (!bubble.linking && !(to && ($('bubble').contains(to) || $('turnMenu').contains(to)))) closeBubble(); },
   });
   makeGrip();
@@ -725,6 +725,7 @@ function applySide() {
   const on = sideVisible();
   document.body.classList.toggle('side-off', !on);
   $('sideShow').hidden = on;
+  fitWeek();
 }
 function setSide(on) {
   if (narrowQuery.matches) side.narrowOpen = on;
@@ -824,7 +825,23 @@ function renderWeek() {
     }, el('span', { class: 'wd-name', text: `週${SHORT[day.getDay()]}` }), el('span', { class: 'wd-num', text: String(day.getDate()) })));
   }
   $('todayBtn').classList.toggle('is-today', state.date === state.today);
+  fitWeek();
 }
+// 頂列放不下整週時，從離正在看那天最遠的日子開始藏（同樣遠的先藏後面的），至少留正在看的那天。
+// 用實際量到的寬度判斷，側邊欄開關、視窗縮放、存檔字樣出現都會重算，不會再疊到「今天」按鈕上。
+function fitWeek() {
+  const bar = document.querySelector('.bar');
+  const days = [...$('weekDays').children];
+  for (const d of days) d.hidden = false;
+  const order = days.map((d, i) => ({ d, i, off: Number(d.dataset.off) })).sort((a, b) => b.off - a.off || b.i - a.i);
+  for (let k = 0; k < order.length - 1 && bar.scrollWidth > bar.clientWidth; k++) order[k].d.hidden = true;
+}
+// 不用 requestAnimationFrame：視窗在背景時它不跑，日期條就會停在舊的樣子
+let fitTimer = 0;
+const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitWeek, 0); };
+new ResizeObserver(() => fitWeek()).observe(document.querySelector('.bar'));
+window.addEventListener('resize', refit);
+if (document.fonts) document.fonts.ready.then(refit);
 
 function renderHeading() {
   const d = fromKey(state.date);

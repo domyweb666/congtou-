@@ -71,8 +71,9 @@ kbd {
 .spacer { flex: 1; min-width: var(--sp-1); }
 .bar-sep { width: 1px; height: var(--sp-5); margin: 0 var(--sp-1); background: var(--ap-sep); flex: none; }
 /* 一整週的日期條：週一到週日，正在看的那天是綠色膠囊，今天前面有個點 */
-.bar { container-type: inline-size; container-name: bar; }
-.week { display: flex; align-items: center; gap: var(--sp-0_5); flex: 0 1 auto; min-width: 0; }
+/* 日期條不縮也不換行；放不下時由 app.src.js 的 fitWeek 從離正在看那天最遠的日子開始藏 */
+.bar { flex-wrap: nowrap; overflow: hidden; }
+.week { display: flex; align-items: center; gap: var(--sp-0_5); flex: none; }
 .week-days { display: flex; gap: var(--sp-0_5); }
 .wd {
   height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: var(--r-md); background: transparent;
@@ -88,9 +89,6 @@ kbd {
 .wd.current, .wd.current .wd-name { background: var(--ap-accent); color: var(--ap-accent-on); }
 .wd.current.today::before { background: var(--ap-accent-on); }
 .wd.current:hover { background: var(--ap-accent-hover, var(--ap-accent)); }
-@container bar (max-width: 780px) { .wd[data-off="6"], .wd[data-off="5"], .wd[data-off="4"] { display: none; } }
-@container bar (max-width: 600px) { .wd[data-off="3"], .wd[data-off="2"] { display: none; } }
-@container bar (max-width: 440px) { .wd[data-off="1"] { display: none; } }
 
 /* 右邊「今天」＋月曆，像一顆分成兩半的按鈕 */
 .today-group { display: inline-flex; align-items: center; flex: none; border: 1px solid var(--ap-sep); border-radius: var(--r-md); }
@@ -269,13 +267,6 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 @keyframes can-wobble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 .side-top:hover .can-sm .can-lid { transform: rotate(-70deg); }
 
-/* 這一天還空著：頁面中間放一個張著嘴的垃圾桶 */
-main { position: relative; }
-.empty-can {
-  position: absolute; left: 0; right: 0; top: 34%; display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
-  pointer-events: none; user-select: none; color: var(--ap-text-3); animation: pop var(--dur-slow) var(--ap-spring);
-}
-.empty-can p { margin: 0; font-size: var(--fs-heading); font-weight: 600; color: var(--ap-text-2); }
 
 /* ---------- 拖放 ---------- */
 .drop {
