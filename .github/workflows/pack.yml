@@ -9,6 +9,8 @@ on:
 jobs:
   mac:
     runs-on: macos-latest
+    env:
+      HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,7 +18,33 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
-      - run: npm run pack:mac
+      # 專案的 Secrets 裡有 Apple 憑證就簽章並送公證；沒有就退回本機簽章，照樣打包得出來
+      - name: 打包 Mac 版
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CSC_LINK" ]; then
+            echo "[pack-mac] 有憑證：Developer ID 簽章並送 Apple 公證" >&2
+            npm run pack:mac
+          else
+            echo "[pack-mac] 沒有憑證：改用本機簽章，打開時會被 Mac 擋一次" >&2
+            unset CSC_LINK CSC_KEY_PASSWORD
+            npm run build
+            npx electron-builder --mac --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false
+          fi
+      # 確認簽章與公證真的成功（沒憑證時跳過）
+      - name: 檢查簽章
+        if: ${{ env.HAS_CERT == 'true' }}
+        run: |
+          for app in dist/mac*/*.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose "$app"
+            xcrun stapler validate "$app"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: mac
