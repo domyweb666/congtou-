@@ -160,6 +160,46 @@ const BlockNumbers = Extension.create({
     })];
   },
 });
+// 貼上、拖進來、放檔案時，新的那幾塊從上面掉進頁面、閃一下淡綠，看得出剛剛丟的是哪段。
+// 只算整塊都是新的（貼在一段字中間不會讓整段掉下來）；時間標記不掉。
+const FALL_MS = 2300;
+let fallTimer = null;
+function changedRange(tr) {
+  let from = Infinity; let to = -Infinity;
+  tr.mapping.maps.forEach((map, i) => map.forEach((_os, _oe, ns, ne) => {
+    const rest = tr.mapping.slice(i + 1);
+    from = Math.min(from, rest.map(ns, -1)); to = Math.max(to, rest.map(ne, 1));
+  }));
+  return from <= to ? { from, to } : null;
+}
+const FallIn = Extension.create({
+  name: 'fallIn',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      state: {
+        init: () => DecorationSet.empty,
+        apply(tr, old) {
+          if (tr.getMeta('fallClear')) return DecorationSet.empty;
+          const set = old.map(tr.mapping, tr.doc);
+          if (!tr.docChanged || !(tr.getMeta('fallIn') || ['paste', 'drop'].includes(tr.getMeta('uiEvent')))) return set;
+          const r = changedRange(tr);
+          if (!r) return set;
+          const decos = [];
+          tr.doc.forEach((node, pos) => {
+            if (pos < r.from - 1 || pos + node.nodeSize > r.to + 1) return;
+            if (node.type.name === 'timeMark' || !hasContent(node)) return;
+            decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'fall-in' }));
+          });
+          if (!decos.length) return set;
+          clearTimeout(fallTimer);
+          fallTimer = setTimeout(() => { if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta('fallClear', true).setMeta('addToHistory', false)); }, FALL_MS);
+          return set.add(tr.doc, decos);
+        },
+      },
+      props: { decorations(st) { return this.getState(st); } },
+    })];
+  },
+});
 const MARK_GAP = 10 * 60 * 1000;
 const lastEditAt = {};
 let pendingMark = null;
@@ -436,7 +476,7 @@ function insertAssets(assets, pos) {
     register(a.rel, a.url);
     return a.isImage ? { type: 'image', attrs: { src: a.url, alt: a.name } } : { type: 'fileChip', attrs: { rel: a.rel, name: a.name, size: a.size } };
   });
-  const chain = editor.chain().focus();
+  const chain = editor.chain().focus().command(({ tr }) => { tr.setMeta('fallIn', true); return true; });
   if (pos != null) {
     // 丟在某一塊上面，就放到那一塊後面，不把原本的段落切開
     const $p = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
@@ -477,7 +517,7 @@ function makeEditor(doc) {
       BlockImage.configure({ inline: false, allowBase64: true }),
       TaskList, TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-      FileChip, TimeMark, BlockNumbers,
+      FileChip, TimeMark, BlockNumbers, FallIn,
       Placeholder.configure({ placeholder: state.date === state.today ? '把剪下來的段落貼在這裡，或直接打字、拖檔案進來。打 / 放圖片、檔案，或換格式。' : `${fmtShort(state.date)} 這天沒有東西。直接打字或貼上就會記在這天。` }),
       Markdown.configure({ html: false, linkify: true, breaks: true, transformPastedText: true, transformCopiedText: false }),
     ],

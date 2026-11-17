@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>蔥蔥丟動畫示範</title>
+<style>
+:root {
+  --bg: #f5f5f4; --surface: #fff; --text: #1c1c1e; --text-2: #6b6b70; --text-3: #a1a1a6;
+  --sep: rgba(0,0,0,.08); --accent: #387346; --accent-bg: rgba(56,115,70,.12);
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1c1c1e; --surface: #2c2c2e; --text: #f2f2f7; --text-2: #a1a1a6; --text-3: #6b6b70; --sep: rgba(255,255,255,.1); --accent: #8fcf9f; --accent-bg: rgba(69,127,85,.24); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px 60px; background: var(--bg); color: var(--text);
+  font-family: -apple-system, 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; line-height: 1.6; }
+h1 { font-size: 22px; margin: 0 auto 4px; max-width: 980px; }
+.lead { color: var(--text-2); margin: 0 auto 20px; max-width: 980px; font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; max-width: 980px; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--sep); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.card h2 { font-size: 15px; margin: 0; padding: 12px 16px 2px; }
+.card .tag { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--accent-bg); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
+.card .tag.new { background: #f6e3c8; color: #8a4b12; }
+.card p.desc { margin: 0; padding: 0 16px 10px; font-size: 13px; color: var(--text-2); }
+.stage { position: relative; height: 260px; margin: 0 12px; border-radius: 10px; background: var(--bg); overflow: hidden; display: grid; place-items: center; }
+.controls { padding: 12px 16px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--sep); background: var(--surface); color: var(--text); cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:active { transform: scale(.97); }
+
+/* ---- 垃圾桶本體（跟 app.css 同一份） ---- */
+.can { display: inline-block; line-height: 0; }
+.can svg { width: 100%; height: 100%; overflow: visible; }
+.can-sm { width: 28px; height: 28px; }
+.can-lg { width: 120px; height: 120px; }
+.can .can-lid { transform: rotate(-45deg); transition: transform 240ms var(--spring); }
+.can .can-body { transition: transform 240ms var(--spring); }
+.can.open .can-lid { transform: rotate(-80deg); }
+.can.open .can-body { animation: can-wobble .9s ease-in-out infinite; }
+.can.gulp .can-lid { animation: can-gulp .6s ease-out; }
+.can.gulp .can-body { animation: can-bounce .6s ease-out; }
+.can.flap .can-lid { animation: can-flap .7s ease-in-out infinite; }
+@keyframes can-gulp { 0% { transform: rotate(-60deg); } 30% { transform: rotate(-2deg); } 55% { transform: rotate(-6deg); } 100% { transform: rotate(-45deg); } }
+@keyframes can-bounce { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(28px); } 60% { transform: translateY(-10px); } }
+@keyframes can-wobble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+@keyframes can-flap { 0%, 100% { transform: rotate(-80deg); } 50% { transform: rotate(-62deg); } }
+
+/* 1 空白頁 */
+.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty p { margin: 0; font-weight: 600; color: var(--text-2); }
+.placeholder { position: absolute; top: 14px; left: 16px; right: 16px; font-size: 13px; color: var(--text-3); }
+
+/* 2 拖檔案 */
+.drop { position: absolute; inset: 0; display: none; place-items: center; background: var(--accent-bg); border: 2px dashed var(--accent); border-radius: 10px; }
+.drop.on { display: grid; animation: fade .2s ease; }
+.drop-card { display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--surface); padding: 18px 26px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.12); font-weight: 600; }
+@keyframes fade { from { opacity: 0; } }
+.file { position: absolute; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--sep); box-shadow: 0 4px 12px rgba(0,0,0,.12); font-size: 13px; z-index: 3; pointer-events: none; transition: left .9s var(--spring), top .9s var(--spring), opacity .3s; }
+
+/* 3 咚一下 */
+.side { position: absolute; left: 0; top: 0; bottom: 0; width: 120px; background: var(--surface); border-right: 1px solid var(--sep); padding: 12px; display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--text-3); }
+.page3 { position: absolute; left: 120px; right: 0; top: 0; bottom: 0; display: grid; place-items: center; }
+
+/* 4 掉進去（提案） */
+.doc { position: absolute; inset: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.para { font-size: 13px; padding: 6px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--sep); }
+.para.fall { animation: fall .7s cubic-bezier(.3,1.4,.5,1) both; }
+@keyframes fall { 0% { transform: translateY(-160px) rotate(-4deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: none; } }
+.para.flash { animation: fall .7s cubic-bezier(.3,1.4,.5,1) both, flash 1.6s ease .6s; }
+@keyframes flash { 0% { background: var(--accent-bg); border-color: var(--accent); } 100% { background: var(--surface); } }
+.can-corner { position: absolute; right: 12px; bottom: 10px; }
+
+/* 5 側邊欄滑過 */
+.side-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface); border-radius: 10px; border: 1px solid var(--sep); }
+.side-top:hover .can-sm .can-lid { transform: rotate(-70deg); }
+.search { width: 160px; height: 28px; border-radius: 8px; background: var(--bg); font-size: 12px; color: var(--text-3); display: flex; align-items: center; padding: 0 10px; }
+
+@media (prefers-reduced-motion: reduce) { .note-rm { display: block !important; } }
+.note-rm { display: none; max-width: 980px; margin: 0 auto 16px; padding: 10px 14px; border-radius: 10px; background: #f6e3c8; color: #8a4b12; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>蔥蔥丟：垃圾桶動畫示範</h1>
+<p class="lead">按每張卡片下面的按鈕播放。前四張已經做進 app；「段落掉進去」是新提案，還沒做。</p>
+<p class="note-rm">你的系統開了「減少動畫」，app 裡這些動畫會自動關掉。這頁照樣播放給你看。</p>
+
+<div class="grid">
+  <section class="card">
+    <h2>空白頁<span class="tag">已做</span></h2>
+    <p class="desc">這天還沒丟東西時，頁面中間是半開的垃圾桶。</p>
+    <div class="stage">
+      <div class="placeholder">把剪下來的段落貼在這裡，或直接打字…</div>
+      <div class="empty"><span class="can can-lg" data-can id="c1"></span><p>剪下來的東西，往這裡丟</p></div>
+    </div>
+    <div class="controls"><button onclick="gulp('c1')">模擬貼上一段</button></div>
+  </section>
+
+  <section class="card">
+    <h2>拖檔案進視窗<span class="tag">已做</span></h2>
+    <p class="desc">檔案一拖進視窗，蓋子整個打開、上下拍動。放開就咚一下。</p>
+    <div class="stage" id="s2">
+      <div class="empty"><span class="can can-lg" data-can id="c2"></span><p>剪下來的東西，往這裡丟</p></div>
+      <div class="drop" id="drop2"><div class="drop-card"><span class="can can-lg open flap" data-can id="c2b"></span><div>放開，丟進今天</div></div></div>
+    </div>
+    <div class="controls"><button onclick="playDrag()">播放：拖一個檔案進來</button></div>
+  </section>
+
+  <section class="card">
+    <h2>丟進來時咚一下<span class="tag">已做</span></h2>
+    <p class="desc">貼上、拖放、選檔案時，所有垃圾桶的蓋子都闔一下再彈開。</p>
+    <div class="stage">
+      <div class="side"><span class="can can-sm" data-can id="c3a"></span>側邊欄</div>
+      <div class="page3"><span class="can can-lg" data-can id="c3b"></span></div>
+    </div>
+    <div class="controls"><button onclick="gulp('c3a');gulp('c3b')">咚一下</button></div>
+  </section>
+
+  <section class="card">
+    <h2>側邊欄左上角<span class="tag">已做</span></h2>
+    <p class="desc">滑鼠移到這一列，小垃圾桶的蓋子會打開。</p>
+    <div class="stage">
+      <div class="side-top"><span class="can can-sm" data-can></span><div class="search">搜尋丟過的東西</div></div>
+    </div>
+    <div class="controls"><button disabled style="opacity:.6;cursor:default">把滑鼠移到上面那一列試試</button></div>
+  </section>
+
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>段落掉進去<span class="tag new">提案，還沒做</span></h2>
+    <p class="desc">貼上的那一段從上面掉下來、彈一下落地，淡綠色閃一下讓你看到剛剛丟的是哪段。右下角的小垃圾桶同時咚一下。</p>
+    <div class="stage" style="height:300px">
+      <div class="doc" id="doc4">
+        <div class="para">14:02　早上剪掉的開頭，先放著。</div>
+        <div class="para">這一段跟第三章重複，之後看要不要合併。</div>
+      </div>
+      <span class="can can-sm can-corner" data-can id="c4" style="width:44px;height:44px"></span>
+    </div>
+    <div class="controls">
+      <button onclick="dropPara()">貼上一段</button>
+      <button onclick="resetDoc()">清空重來</button>
+    </div>
+  </section>
+</div>
+
+<script>
+let seq = 0;
+function canSvg() {
+  const id = 'g' + (++seq);
+  return `<svg viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7A3C12"/><stop offset="1" stop-color="#32160A"/></linearGradient></defs>`
+    + `<rect width="1024" height="1024" rx="225" fill="url(#${id})"/>`
+    + '<g transform="translate(512 540) scale(0.9) translate(-512 -560)"><g class="can-body">'
+    + '<rect x="427" y="900" width="38" height="78" rx="19" fill="#CDB07E" transform="rotate(24 446 900)"/><rect x="493" y="900" width="38" height="78" rx="19" fill="#CDB07E"/><rect x="559" y="900" width="38" height="78" rx="19" fill="#CDB07E" transform="rotate(-24 578 900)"/>'
+    + '<ellipse cx="512" cy="430" rx="282" ry="74" fill="#1A0A05"/>'
+    + '<path d="M230 430 A282 74 0 0 0 794 430 C854 640 774 910 512 920 C250 910 170 640 230 430 Z" fill="#F4E6C8"/><path d="M347 510 Q294 690 400 860M512 510 Q512 690 512 860M677 510 Q730 690 624 860" fill="none" stroke="#CDB07E" stroke-width="44" stroke-linecap="round"/>'
+    + '<ellipse cx="512" cy="430" rx="282" ry="74" fill="none" stroke="#3F8A34" stroke-width="54"/></g>'
+    + '<g transform="translate(205 400)"><g class="can-lid"><g transform="translate(240 -40) rotate(32) scale(0.8) translate(-240 40)"><path d="M240 -60 C180 -170 90 -230 44 -226 C110 -160 170 -100 216 -40 Z" fill="#86CC62"/><path d="M234 -50 C280 -190 360 -270 410 -262 C350 -180 304 -110 274 -40 Z" fill="#86CC62"/></g><rect x="0" y="-40" width="480" height="80" rx="40" fill="#86CC62"/></g></g></g></svg>';
+}
+document.querySelectorAll('[data-can]').forEach((n) => { n.innerHTML = canSvg(); });
+function gulp(id) { const n = document.getElementById(id); n.classList.remove('gulp'); void n.offsetWidth; n.classList.add('gulp'); }
+document.addEventListener('animationend', (e) => { if (e.animationName === 'can-gulp') e.target.closest('.can').classList.remove('gulp'); });
+
+let busy = false;
+function playDrag() {
+  if (busy) return; busy = true;
+  const stage = document.getElementById('s2');
+  const f = document.createElement('div'); f.className = 'file'; f.textContent = '📄 第三章草稿.docx';
+  f.style.left = '-180px'; f.style.top = '20px'; stage.append(f);
+  setTimeout(() => { document.getElementById('drop2').classList.add('on'); f.style.left = '40%'; f.style.top = '30%'; }, 300);
+  setTimeout(() => { f.style.opacity = '0'; document.getElementById('drop2').classList.remove('on'); gulp('c2'); }, 2400);
+  setTimeout(() => { f.remove(); busy = false; }, 2900);
+}
+const SAMPLES = ['最後一格要能順順接回第一格，看不出接縫。', '這句太長，先剪下來，等等看要不要拆兩句。', '本來想放結尾的例子：高三那年的學長。', '舊版標題：寫作時的半個垃圾桶'];
+let si = 0;
+function dropPara() {
+  const doc = document.getElementById('doc4');
+  const p = document.createElement('div'); p.className = 'para flash'; p.textContent = SAMPLES[si++ % SAMPLES.length];
+  doc.append(p);
+  while (doc.children.length > 6) doc.firstElementChild.remove();
+  setTimeout(() => gulp('c4'), 350);
+}
+function resetDoc() { document.getElementById('doc4').innerHTML = ''; }
+</script>
+</body>
+</html>
