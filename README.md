@@ -10,13 +10,12 @@
 
 ## 下載
 
-目前版本 0.6.0。點檔名直接下載：
+目前版本 0.6.1。點檔名直接下載：
 
 | 你的電腦 | 下載 |
 |---|---|
-| Windows | [congcongdiu-0.6.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-win-x64-setup.exe)（安裝檔，122 MB） |
-| Mac，M 系列晶片 | [congcongdiu-0.6.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-mac-arm64.dmg)（121 MB） |
-| Mac，Intel | [congcongdiu-0.6.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.0/congcongdiu-0.6.0-mac-x64.dmg)（128 MB） |
+| Windows | [congcongdiu-0.6.1-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.6.1/congcongdiu-0.6.1-win-x64-setup.exe)（安裝檔，121 MB） |
+| Mac（M 系列、Intel 都能用） | [congcongdiu-0.6.1-mac-universal.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.1/congcongdiu-0.6.1-mac-universal.dmg)（224 MB） |
 
 第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
 
@@ -151,8 +150,7 @@ npm run pack:win
 
 下載對應晶片的 `.dmg`，打開後把「蔥蔥丟」拖進「應用程式」：
 
-- `congcongdiu-版號-mac-arm64.dmg`：M 系列晶片的 Mac
-- `congcongdiu-版號-mac-x64.dmg`：Intel 的 Mac
+- `congcongdiu-版號-mac-universal.dmg`：通用版，M 系列和 Intel 的 Mac 都能用（0.6.0 以前分成 arm64、x64 兩個檔）
 
 Mac 版要在 Mac 上打包。這個 repo 有一支 GitHub Actions 幫忙做：到 Actions 頁籤選「打包」，按 Run workflow，跑完在那一次執行的頁面最下面下載。自己有 Mac 的話，直接跑 `npm install` 和 `npm run pack:mac` 也可以（沒有憑證時要加 `-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false` 改回本機簽章）。
 
