@@ -384,7 +384,7 @@ async function flush() {
     const had = !!state.counts[date];
     if (snap.empty) delete state.counts[date]; else state.counts[date] = 1;
     if (had !== !snap.empty) { renderWeek(); if (!$('calendar').hidden) renderCalendar(); }
-    if (!state.dirty) setSaveState('已儲存');
+    if (!state.dirty) setSaveState('');
   } catch (err) {
     state.dirty = true;
     setSaveState('沒存成功，內容還在這一頁', true);
@@ -396,7 +396,6 @@ async function flush() {
 function markDirty() {
   if (state.loading) return;
   state.dirty = true;
-  setSaveState('儲存中…');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flush, 400);
 }
