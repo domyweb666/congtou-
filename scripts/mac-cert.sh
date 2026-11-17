@@ -79,6 +79,20 @@ case "${1:-}" in
     echo "五個 Secrets 都存好了："
     gh secret list -R "$REPO"
     ;;
+  apikey)
+    # 公證改用 App Store Connect 的 API 金鑰（.p8），不用 App 專用密碼。
+    # 預設用 VoiceType 那時建的團隊金鑰 github-ci；Key ID、Issuer ID 是識別碼，不是秘密。
+    P8="${2:-$HOME/voicetype-signing/AuthKey_95S932UJWS.p8}"
+    KID="${3:-95S932UJWS}"
+    ISS="${4:-f692c415-2c9a-47cc-a775-bc68509e3511}"
+    [ -f "$P8" ] || { echo "[mac-cert] 找不到金鑰檔：$P8" >&2; exit 1; }
+    grep -q "BEGIN PRIVATE KEY" "$P8" || { echo "[mac-cert] $P8 看起來不是 .p8 金鑰" >&2; exit 1; }
+    base64 -w0 "$P8" | gh secret set MAC_API_KEY_P8_BASE64 -R "$REPO"
+    printf '%s' "$KID" | gh secret set MAC_API_KEY_ID -R "$REPO"
+    printf '%s' "$ISS" | gh secret set MAC_API_ISSUER -R "$REPO"
+    echo
+    echo "API 金鑰（$KID）存好了，之後公證都用它。"
+    ;;
   *)
     sed -n '2,8p' "$0"
     ;;
