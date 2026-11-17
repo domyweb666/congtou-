@@ -11,6 +11,7 @@
 <body>
 <aside class="side" id="side" aria-label="日子清單與搜尋">
   <div class="side-top">
+    <span class="can can-sm" data-can title="蔥蔥丟" aria-hidden="true"></span>
     <label class="search-field">
       <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.2"/><path d="M13 13l4 4"/></svg>
       <input id="searchInput" type="text" placeholder="搜尋丟過的東西" aria-label="搜尋所有日子" title="搜尋所有日子（Ctrl+F）">
@@ -45,13 +46,19 @@
 
 <main id="page">
   <div id="editor" class="doc"></div>
+  <div class="empty-can" id="emptyCan" aria-hidden="true" hidden>
+    <span class="can can-lg" data-can></span>
+    <p>剪下來的東西，往這裡丟</p>
+  </div>
 </main>
 </div>
 
 <div class="menu" id="formatMenu" role="menu" aria-label="更多：格式與其他" hidden></div>
 <div class="menu slash" id="slashMenu" role="listbox" aria-label="格式（打字篩選，Enter 套用）" hidden></div>
+<div class="bubble" id="bubble" role="toolbar" aria-label="選取文字的格式" hidden></div>
+<div class="menu turn" id="turnMenu" role="menu" aria-label="把這一塊轉成" hidden></div>
 
-<div class="drop" id="drop" hidden><div>放開，丟進 <span id="dropDate"></span></div></div>
+<div class="drop" id="drop" hidden><div class="drop-card"><span class="can can-lg open" data-can></span><div>放開，丟進 <span id="dropDate"></span></div></div></div>
 
 <div class="popover" id="calendar" role="dialog" aria-label="月曆，用方向鍵選日子" hidden>
   <div class="cal-head">
@@ -148,7 +155,9 @@
           <tr><td><kbd>[ ]</kbd> 空格</td><td>待辦勾選</td></tr>
           <tr><td><kbd>&gt;</kbd> 空格</td><td>引言</td></tr>
           <tr><td><kbd>---</kbd></td><td>分隔線</td></tr>
+          <tr><td>框起一段字</td><td>上方跳出格式列：轉成標題或清單、粗體、斜體、刪除線、程式碼、連結、清除格式</td></tr>
           <tr><td><kbd>Ctrl B</kbd> <kbd>Ctrl I</kbd></td><td>粗體、斜體</td></tr>
+          <tr><td><kbd>Ctrl K</kbd></td><td>把選起來的字加上連結</td></tr>
           <tr><td><kbd>Tab</kbd> <kbd>Shift Tab</kbd></td><td>清單縮排、退回</td></tr>
           <tr><td><kbd>Alt ↑</kbd> <kbd>Alt ↓</kbd></td><td>把這一塊（或清單裡這一項）往上、往下搬</td></tr>
           <tr><td><kbd>Alt T</kbd></td><td>插入現在時間</td></tr>

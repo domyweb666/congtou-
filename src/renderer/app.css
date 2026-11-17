@@ -201,13 +201,39 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 /* 拖曳搬動一塊時，放開會落在哪裡的那條線 */
 .drop-line { background: var(--ap-accent); border-radius: var(--r-full); }
 
+/* ---------- 蔥頭垃圾桶：平常蓋子半開，拖東西進來大開，丟進來咚一下 ---------- */
+.can { display: inline-block; flex: none; line-height: 0; }
+.can svg { width: 100%; height: 100%; overflow: visible; }
+.can-sm { width: 28px; height: 28px; margin-right: var(--sp-2); }
+.can-lg { width: 120px; height: 120px; }
+.can .can-lid { transform: rotate(-45deg); transition: transform var(--dur-slow) var(--ap-spring); }
+.can .can-body { transition: transform var(--dur-slow) var(--ap-spring); }
+.can.open .can-lid { transform: rotate(-80deg); }
+.can.open .can-body { animation: can-wobble 0.9s ease-in-out infinite; }
+.can.gulp .can-lid { animation: can-gulp 0.6s ease-out; }
+.can.gulp .can-body { animation: can-bounce 0.6s ease-out; }
+@keyframes can-gulp { 0% { transform: rotate(-60deg); } 30% { transform: rotate(-2deg); } 55% { transform: rotate(-6deg); } 100% { transform: rotate(-45deg); } }
+@keyframes can-bounce { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(28px); } 60% { transform: translateY(-10px); } }
+@keyframes can-wobble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+.side-top:hover .can-sm .can-lid { transform: rotate(-70deg); }
+
+/* 這一天還空著：頁面中間放一個張著嘴的垃圾桶 */
+main { position: relative; }
+.empty-can {
+  position: absolute; left: 0; right: 0; top: 34%; display: flex; flex-direction: column; align-items: center; gap: var(--sp-3);
+  pointer-events: none; user-select: none; color: var(--ap-text-3); animation: pop var(--dur-slow) var(--ap-spring);
+}
+.empty-can p { margin: 0; font-size: var(--fs-heading); font-weight: 600; color: var(--ap-text-2); }
+
 /* ---------- 拖放 ---------- */
 .drop {
   position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; pointer-events: none;
   background: var(--ap-accent-bg); border: 2px dashed var(--ap-accent);
   font-size: var(--fs-heading); font-weight: 600;
 }
-.drop div { background: var(--ap-surface); padding: var(--sp-3) var(--sp-5); border-radius: var(--r-lg); box-shadow: var(--ap-shadow-float); }
+.drop-card { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); background: var(--ap-surface); padding: var(--sp-5) var(--sp-6); border-radius: var(--r-lg); box-shadow: var(--ap-shadow-float); }
+.drop .can.open .can-lid { animation: can-flap 0.7s ease-in-out infinite; }
+@keyframes can-flap { 0%, 100% { transform: rotate(-80deg); } 50% { transform: rotate(-62deg); } }
 
 /* ---------- 選單 ---------- */
 .menu, .popover {
@@ -230,6 +256,35 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 .menu button.on > span::before { content: "✓ "; }
 .menu.slash { right: auto; width: 240px; max-height: 300px; transform-origin: top left; }
 .menu hr { border: 0; height: 1px; margin: var(--sp-1) var(--sp-1_5); background: var(--ap-sep-soft); }
+
+/* ---------- 選字浮動工具列 ---------- */
+.bubble {
+  position: fixed; z-index: 21; display: flex; align-items: center; gap: var(--sp-0_5); padding: var(--sp-1);
+  border-radius: var(--r-lg); background: var(--ap-material-strong);
+  backdrop-filter: var(--ap-blur); -webkit-backdrop-filter: var(--ap-blur);
+  box-shadow: var(--ap-shadow-menu); color: var(--ap-text); user-select: none;
+  transform-origin: bottom center; animation: pop var(--dur-base) var(--ap-spring);
+}
+.bubble.below { transform-origin: top center; }
+.bb {
+  height: 30px; min-width: 30px; padding: 0 var(--sp-1_5); border: 0; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  background: transparent; color: var(--ap-text-body); font-size: var(--fs-body); white-space: nowrap;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.bb:hover { background: var(--ap-fill); color: var(--ap-text); }
+.bb.on { background: var(--ap-accent-bg); color: var(--ap-accent-text); }
+.bb[aria-expanded="true"] { background: var(--ap-accent-bg); color: var(--ap-accent-text); }
+.bb .ic { width: 15px; height: 15px; }
+.bb.turn-btn { padding: 0 var(--sp-1_5) 0 var(--sp-2); font-weight: 500; }
+.bb.turn-btn .ic { width: 12px; height: 12px; color: var(--ap-text-3); }
+.bb.b-bold span { font-weight: 800; }
+.bb.b-italic span { font-style: italic; font-family: Georgia, serif; font-weight: 600; }
+.bb.b-strike span { text-decoration: line-through; font-weight: 500; }
+.bb-sep { width: 1px; height: 18px; margin: 0 var(--sp-0_5); background: var(--ap-sep); flex: none; }
+.link-input { width: 240px; height: 30px; padding: 0 var(--sp-2); border: 0; border-radius: var(--r-md); background: var(--ap-fill); color: var(--ap-text); outline: none; }
+.link-input:focus { background: var(--ap-surface); box-shadow: var(--ap-ring); }
+.menu.turn { right: auto; width: 200px; transform-origin: top left; z-index: 22; }
 
 /* ---------- 月曆 ---------- */
 .popover { top: var(--bar-h); right: var(--sp-2); width: 284px; padding: var(--sp-2_5); }

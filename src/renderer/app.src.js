@@ -43,6 +43,28 @@ let editor = null;
 let saveTimer = null;
 const page = $('page');
 
+/* ---------- 蔥頭垃圾桶（logo，蓋子會動） ---------- */
+// 圖形來自 assets/icon.svg；蓋子拆成 .can-lid，以鉸鍊為原點轉。平常半開，拖東西進來時大開，丟進來時「咚」闔一下。
+let canSeq = 0;
+function canSvg() {
+  const id = `cang${++canSeq}`;
+  return `<svg viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7A3C12"/><stop offset="1" stop-color="#32160A"/></linearGradient></defs>`
+    + `<rect width="1024" height="1024" rx="225" fill="url(#${id})"/>`
+    + '<g transform="translate(512 540) scale(0.9) translate(-512 -560)"><g class="can-body">'
+    + '<rect x="427" y="900" width="38" height="78" rx="19" fill="#CDB07E" transform="rotate(24 446 900)"/><rect x="493" y="900" width="38" height="78" rx="19" fill="#CDB07E"/><rect x="559" y="900" width="38" height="78" rx="19" fill="#CDB07E" transform="rotate(-24 578 900)"/>'
+    + '<ellipse cx="512" cy="430" rx="282" ry="74" fill="#1A0A05"/>'
+    + '<path d="M230 430 A282 74 0 0 0 794 430 C854 640 774 910 512 920 C250 910 170 640 230 430 Z" fill="#F4E6C8"/><path d="M347 510 Q294 690 400 860M512 510 Q512 690 512 860M677 510 Q730 690 624 860" fill="none" stroke="#CDB07E" stroke-width="44" stroke-linecap="round"/>'
+    + '<ellipse cx="512" cy="430" rx="282" ry="74" fill="none" stroke="#3F8A34" stroke-width="54"/></g>'
+    + '<g transform="translate(205 400)"><g class="can-lid"><g transform="translate(240 -40) rotate(32) scale(0.8) translate(-240 40)"><path d="M240 -60 C180 -170 90 -230 44 -226 C110 -160 170 -100 216 -40 Z" fill="#86CC62"/><path d="M234 -50 C280 -190 360 -270 410 -262 C350 -180 304 -110 274 -40 Z" fill="#86CC62"/></g><rect x="0" y="-40" width="480" height="80" rx="40" fill="#86CC62"/></g></g></g></svg>';
+}
+for (const n of document.querySelectorAll('[data-can]')) n.innerHTML = canSvg();
+// 丟進東西時，每個垃圾桶都闔一下蓋子
+function gulp() {
+  for (const n of document.querySelectorAll('.can')) { n.classList.remove('gulp'); void n.offsetWidth; n.classList.add('gulp'); }
+}
+document.addEventListener('animationend', (e) => { const c = e.target.closest && e.target.closest('.can'); if (c && e.animationName === 'can-gulp') c.classList.remove('gulp'); });
+function canOpen(on) { for (const n of document.querySelectorAll('.can:not(.drop .can)')) n.classList.toggle('open', on); }
+
 /* ---------- 小工具 ---------- */
 function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
@@ -444,7 +466,7 @@ function openNode(node) {
 }
 
 function makeEditor(doc) {
-  hideGrip(); closeSlash(); pendingMark = null;
+  hideGrip(); closeSlash(); if (typeof closeBubble === 'function') closeBubble(); pendingMark = null;
   if (editor) editor.destroy();
   $('editor').textContent = '';
   editor = new Editor({
@@ -468,6 +490,7 @@ function makeEditor(doc) {
         if (!data) return false;
         const text = data.getData('text/plain');
         const files = [...data.files];
+        if (text.trim() || files.length) gulp();
         const real = files.filter((f) => dump.pathFor(f));
         // 從檔案總管複製的檔案一定收；截圖只在沒有文字時收（Excel 複製格子會同時帶一張圖）。
         if (real.length || (files.length && !text.trim())) {
@@ -481,6 +504,7 @@ function makeEditor(doc) {
         if (moved || !event.dataTransfer || !event.dataTransfer.files.length) return false;
         const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
         event.preventDefault();
+        gulp();
         insertFiles([...event.dataTransfer.files], at ? at.pos : null).catch((err) => toast(`檔案沒放進來，這一頁其他內容沒有變動。（${err.message || err}）`, 6000, true));
         return true;
       },
@@ -494,6 +518,8 @@ function makeEditor(doc) {
       handleDoubleClickOn(_view, _pos, node) { return openNode(node); },
       handleKeyDown(_view, event) {
         if (slashKey(event)) { event.preventDefault(); return true; }
+        if (event.key === 'Escape' && !$('bubble').hidden) { event.preventDefault(); closeBubble(); return true; }
+        if (event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') { event.preventDefault(); linkMode(); return true; }
         const sel = editor.state.selection;
         if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && sel instanceof NodeSelection && openNode(sel.node)) { event.preventDefault(); return true; }
         if (event.ctrlKey && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') { event.preventDefault(); copyBlock(currentBlockPos()); return true; }
@@ -509,9 +535,11 @@ function makeEditor(doc) {
         return false;
       },
     },
-    onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; },
-    onUpdate({ transaction }) { if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
-    onSelectionUpdate() { updateSlash(false); },
+    onCreate() { state.loading = true; keepTrailingParagraph(); dropOrphanMarks(); state.loading = false; $('emptyCan').hidden = !editor.isEmpty; },
+    onUpdate({ transaction }) { $('emptyCan').hidden = !editor.isEmpty; if (!state.loading) { keepTrailingParagraph(); maybeMark(transaction); if (!transaction.getMeta('timeMark') && !editor.view.composing) dropOrphanMarks(); markDirty(); updateSlash(true); touchSide(); } },
+    onSelectionUpdate() { updateSlash(false); bubbleOnSelection(); },
+    onTransaction() { if (!$('bubble').hidden && !bubble.linking) { clearTimeout(bubble.timer); bubble.timer = setTimeout(renderBubble, 0); } },
+    onBlur({ event }) { const to = event && event.relatedTarget; if (!bubble.linking && !(to && ($('bubble').contains(to) || $('turnMenu').contains(to)))) closeBubble(); },
   });
   makeGrip();
   editor.view.dom.addEventListener('compositionend', () => { if (pendingMark != null) { const i = pendingMark; pendingMark = null; setTimeout(() => insertMarkBefore(i), 0); } });
@@ -688,6 +716,7 @@ async function pickFiles() {
   if (!paths.length) return;
   const r = await dump.addPaths(state.date, paths);
   insertAssets(r.assets);
+  if (r.assets.length) gulp();
   if (r.skipped.length) toast(`沒收進來：${r.skipped.join('、')}`);
 }
 $('attachBtn').addEventListener('click', pickFiles);
@@ -704,14 +733,16 @@ window.addEventListener('dragenter', (e) => {
   dragDepth++;
   $('dropDate').textContent = state.date === state.today ? '今天' : fmtShort(state.date);
   $('drop').hidden = false;
+  canOpen(true);
 });
 window.addEventListener('dragover', (e) => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = overlayOpen() ? 'none' : 'copy'; } });
-window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
+window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) { $('drop').hidden = true; canOpen(false); } });
 window.addEventListener('drop', (e) => {
-  dragDepth = 0; $('drop').hidden = true;
+  dragDepth = 0; $('drop').hidden = true; canOpen(false);
   if (e.defaultPrevented || !hasFiles(e)) return; // 編輯器已經接走了
   e.preventDefault();
   if (overlayOpen()) return;
+  gulp();
   const doc = editor.state.doc; const last = doc.lastChild;
   const end = last && last.type.name === 'paragraph' && !last.content.size ? doc.content.size - last.nodeSize : doc.content.size;
   insertFiles([...e.dataTransfer.files], end).catch((err) => toast(`檔案沒放進來，這一頁其他內容沒有變動。（${err.message || err}）`, 6000, true));
@@ -850,6 +881,112 @@ function slashKey(event) {
 }
 document.addEventListener('mousedown', (e) => { if (slash.open && !$('slashMenu').contains(e.target)) closeSlash(); });
 page.addEventListener('scroll', closeSlash);
+
+/* ---------- 選字浮動工具列：框起字就出現，像 Notion ---------- */
+// 左邊「轉成」換整塊的樣子（標題、清單…），右邊是字的格式。滑鼠放開或用 Shift+方向鍵選好才出現，不在拖曳途中閃。
+const TURN_NAMES = ['內文', '大標題', '中標題', '小標題', '項目符號', '編號清單', '待辦勾選', '引言', '程式碼區塊'];
+const TURN = TURN_NAMES.map((n) => FORMATS.find((f) => f && f[0] === n));
+const svgIcon = (d, solid) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 20 20'); s.setAttribute('class', solid ? 'ic solid' : 'ic'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = d; return s; };
+const MARKS = [
+  ['B', '粗體（Ctrl B）', (c) => c.toggleBold(), (e) => e.isActive('bold'), 'b-bold'],
+  ['I', '斜體（Ctrl I）', (c) => c.toggleItalic(), (e) => e.isActive('italic'), 'b-italic'],
+  ['S', '刪除線（Ctrl Shift S）', (c) => c.toggleStrike(), (e) => e.isActive('strike'), 'b-strike'],
+  [svgIcon('<path d="M7 6l-4 4 4 4M13 6l4 4-4 4"/>'), '行內程式碼（Ctrl E）', (c) => c.toggleCode(), (e) => e.isActive('code')],
+  [svgIcon('<path d="M8.5 11.5a3 3 0 004.2 0l2.6-2.6a3 3 0 00-4.2-4.2l-.9.9M11.5 8.5a3 3 0 00-4.2 0l-2.6 2.6a3 3 0 004.2 4.2l.9-.9"/>'), '連結（Ctrl K）', null, (e) => e.isActive('link'), 'link'],
+  [svgIcon('<path d="M4 5h9M8.5 5L6 15M12 11l5 5M17 11l-5 5"/>'), '清除格式', (c) => c.unsetAllMarks(), () => false],
+];
+const bubble = { mouse: false, linking: false, timer: null };
+function bubbleWanted() {
+  if (!editor || slash.open || overlayOpen()) return false;
+  const sel = editor.state.selection;
+  if (sel.empty || !(sel instanceof TextSelection)) return false;
+  return !!editor.state.doc.textBetween(sel.from, sel.to, ' ').trim();
+}
+function closeTurn() { $('turnMenu').hidden = true; const t = $('bubble').querySelector('.turn-btn'); if (t) t.setAttribute('aria-expanded', 'false'); }
+function closeBubble() { $('bubble').hidden = true; bubble.linking = false; closeTurn(); }
+function placeBubble() {
+  const box = $('bubble');
+  const range = window.getSelection().rangeCount ? window.getSelection().getRangeAt(0) : null;
+  let r = range && range.getBoundingClientRect();
+  if (!r || (!r.width && !r.height)) { const c = editor.view.coordsAtPos(editor.state.selection.from); r = { top: c.top, bottom: c.bottom, left: c.left, width: 0 }; }
+  const floor = page.getBoundingClientRect().top + 4;
+  const h = box.offsetHeight; const w = box.offsetWidth;
+  const above = r.top - h - 8 >= floor;
+  box.style.top = `${above ? r.top - h - 8 : r.bottom + 8}px`;
+  box.style.left = `${Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8))}px`;
+  box.classList.toggle('below', !above);
+}
+function linkMode() {
+  if (!bubbleWanted()) return;
+  bubble.linking = true; closeTurn();
+  const box = $('bubble'); box.textContent = '';
+  const old = editor.getAttributes('link').href || '';
+  const input = el('input', { class: 'link-input', type: 'text', placeholder: '貼上網址，Enter 套用', 'aria-label': '連結網址', value: old });
+  const done = (apply) => {
+    if (apply) {
+      const u = input.value.trim();
+      const chain = editor.chain().focus().extendMarkRange('link');
+      (u ? chain.setLink({ href: /^[a-z][\w+.-]*:/i.test(u) ? u : `https://${u}` }) : chain.unsetLink()).run();
+    } else editor.commands.focus();
+    bubble.linking = false; renderBubble();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); done(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+  });
+  input.addEventListener('blur', () => { if (bubble.linking) setTimeout(() => { if (bubble.linking && !$('bubble').contains(document.activeElement)) closeBubble(); }, 0); });
+  box.append(input, old ? el('button', { class: 'bb', title: '拿掉連結', 'aria-label': '拿掉連結', onclick: () => { input.value = ''; done(true); } }, svgIcon('<path d="M5 5l10 10M15 5L5 15"/>')) : null);
+  box.hidden = false; placeBubble(); input.focus(); input.select();
+}
+function renderBubble() {
+  clearTimeout(bubble.timer);
+  if (bubble.linking) return;
+  if (bubble.mouse || !bubbleWanted()) { closeBubble(); return; }
+  const box = $('bubble'); box.textContent = '';
+  const cur = TURN.find((f) => f[3](editor));
+  const turnBtn = el('button', { class: 'bb turn-btn', title: '把這一塊轉成標題、清單、引言…', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: () => ($('turnMenu').hidden ? openTurn(turnBtn) : closeTurn()) },
+    el('span', { text: cur ? cur[0] : '轉成' }), svgIcon('<path d="M5.5 8l4.5 4.5L14.5 8"/>'));
+  box.append(turnBtn, el('span', { class: 'bb-sep' }));
+  for (const [label, title, run, active, cls] of MARKS) {
+    const on = active(editor);
+    box.append(el('button', { class: `bb${on ? ' on' : ''}${cls ? ` ${cls}` : ''}`, title, 'aria-label': title, 'aria-pressed': on ? 'true' : 'false',
+      onclick: () => { if (!run) { linkMode(); return; } run(editor.chain().focus()).run(); renderBubble(); } },
+    typeof label === 'string' ? el('span', { text: label }) : label));
+  }
+  box.hidden = false;
+  placeBubble();
+}
+function openTurn(btn) {
+  const menu = $('turnMenu'); menu.textContent = '';
+  for (const f of TURN) {
+    const on = f[3](editor);
+    menu.append(el('button', { role: 'menuitemcheckbox', 'aria-checked': on ? 'true' : 'false', class: on ? 'on' : '',
+      onclick: () => { closeTurn(); if (!on) f[2](editor.chain().focus()).run(); setTimeout(renderBubble, 0); } },
+    el('span', { text: f[0] }), f[1] ? el('kbd', { text: f[1] }) : null));
+  }
+  menu.hidden = false;
+  const r = btn.getBoundingClientRect();
+  const h = menu.offsetHeight;
+  menu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${r.bottom + 6 + h <= window.innerHeight - 8 ? r.bottom + 6 : Math.max(8, r.top - 6 - h)}px`;
+  btn.setAttribute('aria-expanded', 'true');
+}
+for (const id of ['bubble', 'turnMenu']) $(id).addEventListener('mousedown', (e) => { if (!e.target.closest('input')) e.preventDefault(); });
+document.addEventListener('mousedown', (e) => {
+  if (editor && editor.view.dom.contains(e.target)) { bubble.mouse = true; closeBubble(); return; }
+  if (!$('bubble').hidden && !$('bubble').contains(e.target) && !$('turnMenu').contains(e.target)) closeBubble();
+});
+document.addEventListener('mouseup', () => { if (bubble.mouse) { bubble.mouse = false; setTimeout(renderBubble, 0); } });
+page.addEventListener('scroll', () => { if (!$('bubble').hidden) { closeTurn(); placeBubble(); } });
+window.addEventListener('resize', () => { if (!$('bubble').hidden) placeBubble(); });
+// 鍵盤選字（Shift+方向鍵）停一下才出現；打字把選取蓋掉就收起來
+function bubbleOnSelection() {
+  if (bubble.mouse || bubble.linking) return;
+  if (!bubbleWanted()) { closeBubble(); return; }
+  clearTimeout(bubble.timer);
+  bubble.timer = setTimeout(renderBubble, $('bubble').hidden ? 250 : 0);
+}
 
 /* ---------- 月曆 ---------- */
 function renderCalendar() {
