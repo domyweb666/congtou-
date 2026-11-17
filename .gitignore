@@ -3,3 +3,8 @@ dist/
 shots/
 src/renderer/app.js
 web/index.html
+# 簽章憑證與私鑰絕對不進 git
+*.p12
+*.key
+*.cer
+*.certSigningRequest

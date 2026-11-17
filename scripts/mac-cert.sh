@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Mac 簽章憑證小工具（在 Windows 的 Git Bash 就能跑，不需要 Mac）
+#
+#   bash scripts/mac-cert.sh csr          第一步：產生私鑰和憑證申請檔（CSR），拿去 Apple 網站換憑證
+#   bash scripts/mac-cert.sh secrets 檔案.cer   第二步：把 Apple 給的 .cer 包成 .p12，連同帳號資料存進 GitHub Secrets
+#
+# 私鑰和 .p12 放在專案外面的 ~/congtou-signing，不會進 git。密碼都由你自己打，不會印在畫面上。
+set -euo pipefail
+DIR="$HOME/congtou-signing"
+REPO="domyweb666/congtou-"
+mkdir -p "$DIR"
+
+case "${1:-}" in
+  csr)
+    if [ -f "$DIR/developer-id.key" ]; then
+      echo "[mac-cert] $DIR/developer-id.key 已經存在，沿用它，不重新產生" >&2
+    else
+      openssl genrsa -out "$DIR/developer-id.key" 2048
+    fi
+    # MSYS_NO_PATHCONV：Git Bash 會把 /CN=... 當成路徑亂改，關掉它
+    MSYS_NO_PATHCONV=1 openssl req -new -key "$DIR/developer-id.key" -out "$DIR/developer-id.certSigningRequest" -subj "/CN=Congcongdiu Developer ID/C=TW"
+    echo
+    echo "好了。把這個檔案上傳到 Apple 網站："
+    echo "  $DIR/developer-id.certSigningRequest"
+    ;;
+  secrets)
+    CER="${2:-}"
+    [ -f "$CER" ] || { echo "[mac-cert] 找不到 .cer 檔：$CER" >&2; exit 1; }
+    [ -f "$DIR/developer-id.key" ] || { echo "[mac-cert] 找不到私鑰，要先跑 csr 那一步" >&2; exit 1; }
+    openssl x509 -inform DER -in "$CER" -out "$DIR/developer-id.pem" 2>/dev/null || cp "$CER" "$DIR/developer-id.pem"
+    echo "這張憑證是："
+    openssl x509 -in "$DIR/developer-id.pem" -noout -subject
+    echo
+    read -r -s -p "幫 .p12 設一組密碼（打字不會顯示）：" P12PASS; echo
+    # 用 3DES 加密，Mac 的鑰匙圈才讀得進去（OpenSSL 3 預設的 AES 舊版 macOS 不認）
+    openssl pkcs12 -export -inkey "$DIR/developer-id.key" -in "$DIR/developer-id.pem" -out "$DIR/developer-id.p12" \
+      -name "Developer ID Application" -passout "pass:$P12PASS" -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+    base64 -w0 "$DIR/developer-id.p12" | gh secret set MAC_CERT_P12_BASE64 -R "$REPO"
+    printf '%s' "$P12PASS" | gh secret set MAC_CERT_PASSWORD -R "$REPO"
+    unset P12PASS
+    read -r -p "Apple 帳號的 email：" AID
+    printf '%s' "$AID" | gh secret set APPLE_ID -R "$REPO"
+    read -r -p "Team ID（10 碼英數字）：" TID
+    printf '%s' "$TID" | gh secret set APPLE_TEAM_ID -R "$REPO"
+    read -r -s -p "App 專用密碼（xxxx-xxxx-xxxx-xxxx，打字不會顯示）：" ASP; echo
+    printf '%s' "$ASP" | gh secret set APPLE_APP_SPECIFIC_PASSWORD -R "$REPO"
+    unset ASP
+    echo
+    echo "五個 Secrets 都存好了："
+    gh secret list -R "$REPO"
+    ;;
+  *)
+    sed -n '2,8p' "$0"
+    ;;
+esac
