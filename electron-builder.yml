@@ -42,6 +42,7 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   notarize: true
   artifactName: congcongdiu-${version}-mac-${arch}.${ext}
+  # 通用版：一個 dmg 同時能跑在 M 系列和 Intel 的 Mac，給別人下載不用先查晶片
   target:
     - target: dmg
-      arch: [arm64, x64]
+      arch: [universal]
