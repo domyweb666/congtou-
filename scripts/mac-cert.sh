@@ -49,6 +49,36 @@ case "${1:-}" in
     echo "五個 Secrets 都存好了："
     gh secret list -R "$REPO"
     ;;
+  reuse)
+    # 沿用別的專案做好的 .p12（例如 ~/topoi-signing），不用再去 Apple 網站換憑證
+    SRC="${2:-$HOME/topoi-signing}"
+    P12="$SRC/apple-cert.p12"; PASSFILE="$SRC/p12-password.txt"
+    [ -f "$P12" ] && [ -f "$PASSFILE" ] || { echo "[mac-cert] $SRC 裡要有 apple-cert.p12 和 p12-password.txt" >&2; exit 1; }
+    # Windows 版 openssl 看不懂 Git Bash 的 /c/Users/... 路徑，要換成 C:/Users/...
+    winpath() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+    PASSARG="file:$(winpath "$PASSFILE")"
+    SUBJ=$(openssl pkcs12 -in "$P12" -nokeys -passin "$PASSARG" 2>/dev/null | openssl x509 -noout -subject 2>/dev/null \
+      || openssl pkcs12 -legacy -in "$P12" -nokeys -passin "$PASSARG" 2>/dev/null | openssl x509 -noout -subject 2>/dev/null || true)
+    case "$SUBJ" in
+      *"Developer ID Application"*) echo "憑證：${SUBJ#subject=}" ;;
+      *) echo "[mac-cert] 這個 .p12 打不開，或不是 Developer ID Application 憑證：$SUBJ" >&2; exit 1 ;;
+    esac
+    TID=$(printf '%s' "$SUBJ" | sed -n 's/.*OU=\([A-Z0-9]\{10\}\).*/\1/p')
+    base64 -w0 "$P12" | gh secret set MAC_CERT_P12_BASE64 -R "$REPO"
+    tr -d '\r\n' < "$PASSFILE" | gh secret set MAC_CERT_PASSWORD -R "$REPO"
+    printf '%s' "$TID" | gh secret set APPLE_TEAM_ID -R "$REPO"
+    echo "憑證、憑證密碼、Team ID（$TID）已存進 GitHub。"
+    echo
+    read -r -p "Apple 帳號的 email：" AID
+    printf '%s' "$AID" | gh secret set APPLE_ID -R "$REPO"
+    echo "App 專用密碼：topoi 用的那組還記得就打那組；忘了就到 https://account.apple.com 產生一組新的"
+    read -r -s -p "App 專用密碼（xxxx-xxxx-xxxx-xxxx，打字不會顯示）：" ASP; echo
+    printf '%s' "$ASP" | gh secret set APPLE_APP_SPECIFIC_PASSWORD -R "$REPO"
+    unset ASP
+    echo
+    echo "五個 Secrets 都存好了："
+    gh secret list -R "$REPO"
+    ;;
   *)
     sed -n '2,8p' "$0"
     ;;
