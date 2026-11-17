@@ -10,15 +10,15 @@
 
 ## 下載
 
-目前版本 0.4.0。點檔名直接下載：
+目前版本 0.5.0。點檔名直接下載：
 
 | 你的電腦 | 下載 |
 |---|---|
-| Windows | [congcongdiu-0.4.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-win-x64-setup.exe)（安裝檔，122 MB） |
-| Mac，M 系列晶片 | [congcongdiu-0.4.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-mac-arm64.dmg)（120 MB） |
-| Mac，Intel | [congcongdiu-0.4.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.4.0/congcongdiu-0.4.0-mac-x64.dmg)（127 MB） |
+| Windows | [congcongdiu-0.5.0-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-win-x64-setup.exe)（安裝檔，122 MB） |
+| Mac，M 系列晶片 | [congcongdiu-0.5.0-mac-arm64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-mac-arm64.dmg)（120 MB） |
+| Mac，Intel | [congcongdiu-0.5.0-mac-x64.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.5.0/congcongdiu-0.5.0-mac-x64.dmg)（127 MB） |
 
-不想安裝的話，[Releases 頁面](https://github.com/domyweb666/congtou-/releases/latest)還有解壓縮就能用的 zip。第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
+第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
 
 
 ## 怎麼用
@@ -29,6 +29,7 @@
 
 - 貼上會保留格式：標題、項目符號、粗體、表格。貼 Markdown 純文字也會變成格式。
 - Ctrl+V 貼截圖或從檔案總管複製的檔案；也可以把檔案拖進頁面。圖片直接顯示，其他檔案顯示成一塊，點兩下打開（或選到之後按 Enter）。
+- 框起一段字，上方會跳出格式列：把那一塊轉成標題或清單，或加粗體、斜體、刪除線、程式碼、連結（Ctrl+K）。
 - 只貼一個網址會自動換成網頁標題。
 - 今天這一頁隔 10 分鐘以上再丟東西，會自動加一條時間線，看得出哪些是同一批丟的。
 - 全域快捷鍵預設 Ctrl+Alt+D：在任何程式裡叫出或收起視窗（可在設定裡改）。丟完按 Esc 就收起來。
