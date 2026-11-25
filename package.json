@@ -1,7 +1,7 @@
 {
   "name": "congcongdiu",
   "productName": "蔥蔥丟",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "寫作時的剪下暫存區：每天一頁，把剪掉的段落先丟進來，幾天內要用再撈回去。",
   "main": "src/main.js",
   "author": "DOMYWEB",
