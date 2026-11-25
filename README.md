@@ -10,12 +10,12 @@
 
 ## 下載
 
-目前版本 0.6.1。點檔名直接下載：
+目前版本 0.6.2。點檔名直接下載：
 
 | 你的電腦 | 下載 |
 |---|---|
-| Windows | [congcongdiu-0.6.1-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.6.1/congcongdiu-0.6.1-win-x64-setup.exe)（安裝檔，121 MB） |
-| Mac（M 系列、Intel 都能用） | [congcongdiu-0.6.1-mac-universal.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.1/congcongdiu-0.6.1-mac-universal.dmg)（224 MB） |
+| Windows | [congcongdiu-0.6.2-win-x64-setup.exe](https://github.com/domyweb666/congtou-/releases/download/v0.6.2/congcongdiu-0.6.2-win-x64-setup.exe)（安裝檔，121 MB） |
+| Mac（M 系列、Intel 都能用） | [congcongdiu-0.6.2-mac-universal.dmg](https://github.com/domyweb666/congtou-/releases/download/v0.6.2/congcongdiu-0.6.2-mac-universal.dmg)（224 MB） |
 
 第一次打開被系統擋下來怎麼辦，看下面的[安裝](#安裝)。
 
@@ -45,7 +45,7 @@
 
 ### 撈回去
 
-滑鼠移到某一塊，左邊會出現三顆小按鈕：「用過了」、「複製整塊」和抓手。不想碰滑鼠就按 Ctrl+Shift+C，會複製游標所在的那一整塊，格式一起帶走。
+滑鼠移到某一塊，左邊會出現三顆小按鈕：「用過了」、「複製整塊」和抓手。視窗窄的時候只出現抓手，滑到抓手上，另外兩顆才會展開。不想碰滑鼠就按 Ctrl+Shift+C，會複製游標所在的那一整塊，格式一起帶走。
 
 撈回稿子之後，按勾勾（或 Ctrl+Shift+U）把那一塊標成「用過了」，它會變灰、劃線，過幾天回來看也分得出哪些已經放回稿子。複製整塊時，提示旁邊也有一顆「標成用過了」。再按一次就取消。
 
@@ -82,7 +82,7 @@ Ctrl+F 會搜尋所有日子，多個字用空格分開。結果直接列出命�
 
 按頂列的圖釘（或 Ctrl+Shift+P），視窗會縮成一條貼在螢幕右邊，而且一直浮在最上層，寫稿時剪下、丟過來、撈回去都不用切換視窗。再按一次回到原本的大小和位置。
 
-<img src="docs/img/narrow.png" width="300" alt="視窗縮到很窄時的樣子">
+<img src="docs/img/narrow.png" width="300" alt="釘在最上層時的窄條：頂列一排按鈕，下面是今天這一頁，左右留白一樣寬">
 
 ## 快捷鍵
 
@@ -148,7 +148,7 @@ npm run pack:win
 
 ### Mac
 
-下載對應晶片的 `.dmg`，打開後把「蔥蔥丟」拖進「應用程式」：
+下載 `.dmg`，打開後把「蔥蔥丟」拖進「應用程式」：
 
 - `congcongdiu-版號-mac-universal.dmg`：通用版，M 系列和 Intel 的 Mac 都能用（0.6.0 以前分成 arm64、x64 兩個檔）
 
