@@ -14,6 +14,7 @@
   --ctl-h: 32px;
   --doc-w: 720px;
   --gutter-w: 80px;
+  --gutter-narrow: 28px;
   --doc-top: 40px;
   --num-w: 36px;
   --side-w: 248px;
@@ -111,7 +112,7 @@ kbd {
 }
 
 /* ---------- 側邊欄：搜尋、今天、最近幾天、更早 ---------- */
-.right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.right { flex: 1; min-width: 0; display: flex; flex-direction: column; container: right / inline-size; }
 .side { width: var(--side-w); flex: none; display: flex; flex-direction: column; background: var(--ap-bg); border-right: 1px solid var(--ap-sep-soft); user-select: none; }
 body.side-off .side { display: none; }
 .side-top { flex: none; height: var(--bar-h); display: flex; align-items: center; padding: 0 var(--sp-2_5); }
@@ -162,11 +163,15 @@ body.side-off .side { display: none; }
 .side .note { padding: var(--sp-3) var(--sp-2); font-size: var(--fs-small); }
 
 /* ---------- 這一天 ---------- */
-main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + var(--sp-4)) 0 calc(var(--gutter-w) + var(--sp-2)); outline: none; cursor: text; }
+/* 左右留白永遠一樣寬：窄的時候只夠放抓手，從 600 開始隨寬度長到放得下三顆按鈕（704）。捲軸的位置左右都留，捲軸出現也不會歪 */
+main {
+  --page-pad: clamp(var(--gutter-narrow), var(--gutter-narrow) + (100cqi - 600px) / 2, var(--gutter-w));
+  flex: 1; overflow-y: auto; scrollbar-gutter: stable both-edges; padding: var(--doc-top) var(--page-pad) 0; outline: none; cursor: text;
+}
 
 /* 這一天的文件 */
 .doc { max-width: var(--doc-w); margin: 0 auto; position: relative; font-family: var(--doc-font); font-size: var(--doc-fs); line-height: var(--doc-lh); color: var(--ap-text-body); }
-.gutter { position: absolute; left: calc(var(--gutter-w) * -1); display: flex; gap: var(--sp-0_5); }
+.gutter { position: absolute; z-index: 2; left: calc(var(--gutter-w) * -1); display: flex; gap: var(--sp-0_5); }
 .gutter-btn {
   width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--ap-text-3);
   display: grid; place-items: center; user-select: none; transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
@@ -422,9 +427,19 @@ main { flex: 1; overflow-y: auto; padding: var(--doc-top) calc(var(--num-w) + va
 }
 /* ---------- 再窄：頂列只有一排，先收星期，再收「已儲存」 ---------- */
 @media (max-width: 620px) {
-  main { padding: var(--sp-8) var(--sp-3) 0 calc(var(--gutter-w) + var(--sp-1)); }
+  main { padding-top: var(--sp-8); }
   .keys td:first-child { width: auto; white-space: normal; }
-  /* 窄視窗沒有位置放編號 */
+}
+/* 內容區放不下三顆按鈕：左邊只留抓手，滑到抓手上才往右展開「複製」「用過了」 */
+@container right (max-width: 703.98px) {
+  .gutter { left: calc(var(--gutter-narrow) * -1); flex-direction: row-reverse; border-radius: var(--r-sm); }
+  .gutter:not(:hover) .gutter-btn:not(.grip) { display: none; }
+  .gutter:hover { background: var(--ap-surface); box-shadow: var(--ap-shadow-float); }
+  .moving-block .gutter { background: none; box-shadow: none; }
+  .moving-block .gutter-btn:not(.grip) { opacity: 0; }
+}
+/* 右邊窄到沒有位置放編號 */
+@container right (max-width: 619.98px) {
   .doc .ProseMirror > .numbered::before { display: none; }
 }
 @media (max-width: 460px) {
